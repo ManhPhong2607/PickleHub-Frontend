@@ -1,0 +1,351 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer base {
+  :root {
+    --bg-main: #f8fafc;
+    --text-main: #0f172a;
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --border-color: rgba(226, 232, 240, 0.8);
+    
+    /* Impeccable Design Tokens */
+    --ks-kinpaku: oklch(84% 0.19 80.46);
+    --ks-emerald: oklch(62% 0.19 155);
+    --ks-patina: oklch(70% 0.12 188);
+    --ks-lacquer: oklch(9% 0.01 155);
+    --ks-hairline: rgba(16, 185, 129, 0.2);
+  }
+
+  .dark {
+    --bg-main: #090d16;
+    --text-main: #f8fafc;
+    --card-bg: rgba(15, 23, 42, 0.8);
+    --border-color: rgba(30, 41, 59, 0.8);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* Glassmorphism & Impeccable Surface Styles */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dark .glass-nav {
+  background: rgba(9, 13, 22, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+}
+
+/* Impeccable Bento Grid 12 Columns */
+.ks-bento {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.ks-bento-tile {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.5rem;
+  padding: 1.75rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.dark .ks-bento-tile {
+  background-color: rgba(15, 23, 42, 0.7);
+  border-color: rgba(30, 41, 59, 0.8);
+}
+
+.ks-bento-tile:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 20px 40px -15px rgba(16, 185, 129, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Impeccable Glint Hover Overlay */
+.ks-glint {
+  position: relative;
+  overflow: hidden;
+}
+
+.ks-glint::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 45%,
+    rgba(245, 158, 11, 0.15) 50%,
+    transparent 55%
+  );
+  transform: rotate(30deg) translateY(-100%);
+  transition: transform 0.8s ease-in-out;
+  pointer-events: none;
+}
+
+.ks-glint:hover::after {
+  transform: rotate(30deg) translateY(100%);
+}
+
+/* Glowing Ambient & Metallic Highlights */
+.emerald-glow {
+  box-shadow: 0 0 50px -10px rgba(16, 185, 129, 0.35);
+}
+
+.dark .emerald-glow {
+  box-shadow: 0 0 60px -5px rgba(16, 185, 129, 0.45);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #10b981;
+}
+
+/* Keyframes for subtle ambient animations */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(2deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+/* Continuous Infinite Marquee Slider for Partners */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 22s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Osmo Parallax Multi-Layer Component Styles */
+.parallax {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background-color: #090d16;
+}
+
+.parallax__header {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.parallax__visuals {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.parallax__layers {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.parallax__layer-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.parallax__layer-title {
+  position: absolute;
+  z-index: 3;
+  text-align: center;
+  pointer-events: none;
+}
+
+.parallax__title {
+  font-size: clamp(3rem, 10vw, 8rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.05em;
+  color: #ffffff;
+  text-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+
+.parallax__fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 150px;
+  background: linear-gradient(to top, #090d16 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.parallax__content {
+  position: relative;
+  z-index: 11;
+  padding: 4rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #090d16;
+  color: #ffffff;
+}
+
+.osmo-icon-svg {
+  width: 80px;
+  height: 80px;
+  color: #10b981;
+}
+
+.osmo-credits {
+  padding: 2rem;
+  text-align: center;
+  background-color: #090d16;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.osmo-credits__p-a {
+  color: #10b981;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* ─── Modern Admin Custom Scrollbar ─── */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.8);
+  border-radius: 9999px;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(203, 213, 225, 0.9);
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.8);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.9);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.8);
+}
+
+/* ─── Continuous Running Marquee Banner ─── */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee-infinite {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 35s linear infinite;
+}
+
+.animate-marquee-infinite:hover {
+  animation-play-state: paused;
+}
+
