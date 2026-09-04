@@ -8,6 +8,8 @@ import {
   Tag, Sparkles, ChevronRight, CheckCircle2, ShieldCheck, ShoppingBag
 } from 'lucide-react';
 import { blogApi, PostDetailDto, PostListDto } from '@/lib/api/blogApi';
+import { catalogApi } from '@/lib/api/catalogApi';
+import BlogContentRenderer from '@/components/blog/BlogContentRenderer';
 
 export default function BlogDetailPage() {
   const params = useParams();
@@ -18,6 +20,7 @@ export default function BlogDetailPage() {
   const [relatedPosts, setRelatedPosts] = useState<PostListDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
+  const [fallbackProducts, setFallbackProducts] = useState<any[]>([]);
 
   // Fallback map if backend is not yet populated
   const fallbackDetails: Record<string, Partial<PostDetailDto>> = {
@@ -100,8 +103,18 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
 
     blogApi
       .getPostBySlug(slug)
-      .then((data) => {
+      .then(async (data) => {
         setPost(data);
+        // Nếu backend chưa trả relatedProducts nhưng có relatedProductIds, fetch bổ sung từ Catalog API
+        if ((!data.relatedProducts || data.relatedProducts.length === 0) && data.relatedProductIds && data.relatedProductIds.length > 0) {
+          try {
+            const allProducts = await catalogApi.getProducts();
+            const matched = allProducts.filter((p: any) => data.relatedProductIds?.includes(p.id));
+            setFallbackProducts(matched);
+          } catch (e) {
+            console.warn('[BlogDetail] Error fetching fallback products:', e);
+          }
+        }
       })
       .catch((err) => {
         console.warn('[BlogDetail] Error fetching post by slug, fallback:', err);
@@ -164,6 +177,10 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
     ? new Date(post.publishedAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Mới cập nhật';
 
+  const displayRelatedProducts = (post.relatedProducts && post.relatedProducts.length > 0)
+    ? post.relatedProducts
+    : fallbackProducts;
+
   return (
     <div className="py-10 sm:py-14 bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -207,38 +224,24 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
           </h1>
 
           {post.summary && (
-            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic border-l-4 border-emerald-500 pl-4 py-1 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-r-2xl">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed italic border-l-4 border-emerald-500 pl-4 py-1">
               {post.summary}
             </p>
           )}
 
-          {/* Author & Share Bar */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow-md">
-                PH
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Ban biên tập PickleHub</p>
-                <span className="text-[11px] text-slate-400 font-medium">Chuyên gia thiết bị & Huấn luyện viên</span>
-              </div>
+          {/* Social Share & Action Bar */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 dark:border-slate-800">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <User className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Biên tập bởi đội ngũ chuyên gia <strong className="text-slate-800 dark:text-slate-200">PickleHub</strong></span>
             </div>
 
             <button
               onClick={handleShare}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
             >
-              {copied ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  <span className="text-emerald-600">Đã copy link!</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-4 h-4" />
-                  <span>Chia sẻ bài viết</span>
-                </>
-              )}
+              <Share2 className="w-3.5 h-3.5" />
+              <span>{copied ? 'Đã sao chép link!' : 'Chia sẻ'}</span>
             </button>
           </div>
         </header>
@@ -256,15 +259,11 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
 
         {/* Article Body Content */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-6">
-          <div
-            className="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed text-sm sm:text-base space-y-4 whitespace-pre-line"
-          >
-            {post.content}
-          </div>
+          <BlogContentRenderer content={post.content} />
         </div>
 
         {/* Related Products Widget (if any) */}
-        {post.relatedProducts && post.relatedProducts.length > 0 && (
+        {displayRelatedProducts && displayRelatedProducts.length > 0 && (
           <div className="bg-emerald-50/60 dark:bg-emerald-950/30 rounded-3xl p-6 sm:p-8 border border-emerald-200/60 dark:border-emerald-900/50 space-y-4">
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-emerald-600" />
@@ -274,27 +273,33 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {post.relatedProducts.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/product/${p.id}`}
-                  className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:border-emerald-500 transition-all flex items-center gap-3 group"
-                >
-                  <img
-                    src={p.imageUrl || '/images/paddle.png'}
-                    alt={p.name}
-                    className="w-14 h-14 object-contain rounded-xl bg-slate-50 dark:bg-slate-800 p-1 shrink-0"
-                  />
-                  <div className="truncate space-y-0.5">
-                    <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-emerald-600">
-                      {p.name}
-                    </h4>
-                    <p className="font-extrabold text-xs text-emerald-600">
-                      {(p.effectivePrice || p.basePrice).toLocaleString('vi-VN')} ₫
-                    </p>
-                  </div>
-                </Link>
-              ))}
+              {displayRelatedProducts.map((p: any) => {
+                const priceValue = p?.price ?? p?.effectivePrice ?? p?.basePrice ?? 0;
+                const formattedPrice = Number(priceValue).toLocaleString('vi-VN');
+                const productUrl = `/products/${p.id || p.slug}`;
+
+                return (
+                  <Link
+                    key={p.id || p.slug || Math.random()}
+                    href={productUrl}
+                    className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:border-emerald-500 hover:shadow-md transition-all flex items-center gap-3 group"
+                  >
+                    <img
+                      src={p.imageUrl || p.thumbnailUrl || '/images/paddle.png'}
+                      alt={p.name || 'Sản phẩm Pickleball'}
+                      className="w-14 h-14 object-contain rounded-xl bg-slate-50 dark:bg-slate-800 p-1 shrink-0"
+                    />
+                    <div className="truncate space-y-0.5">
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-emerald-600">
+                        {p.name}
+                      </h4>
+                      <p className="font-extrabold text-xs text-emerald-600">
+                        {formattedPrice} ₫
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

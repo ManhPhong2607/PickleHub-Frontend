@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -23,11 +23,14 @@ import { OrderStatusDonutChart } from './charts/OrderStatusDonutChart';
 import { ProductConversionSection } from './charts/ProductConversionSection';
 import { LowStockAlertModal } from './LowStockAlertModal';
 import { DatePeriodFilter, DatePeriodValue, computePeriod } from './common/DatePeriodFilter';
+import { AnimatedNumber } from './common/AnimatedNumber';
+import gsap from 'gsap';
 
 export const DashboardModule: React.FC = () => {
   // ── FILTER & SETTINGS ──────────────────────────────────────────────────
   const [period, setPeriod] = useState<DatePeriodValue>(() => computePeriod('preset', { presetKey: '30days' }));
   const [stockThreshold, setStockThreshold] = useState<number>(15);
+  const [activeTab, setActiveTab] = useState<'analytics' | 'orders_conversion'>('analytics');
 
   const days = period.days;
 
@@ -59,6 +62,33 @@ export const DashboardModule: React.FC = () => {
   const [recentOrdersLoading, setRecentOrdersLoading] = useState(true);
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [catalogLoading, setCatalogLoading] = useState(true);
+
+  const cardsContainerRef = React.useRef<HTMLDivElement>(null);
+  const hasAnimatedCardsRef = React.useRef<boolean>(false);
+
+  // GSAP Stagger Entrance cho 4 metric cards (CHỈ CHẠY 1 LẦN khi mount, tự động clearProps sau khi xong để không bị ẩn thẻ)
+  useEffect(() => {
+    if (!cardsContainerRef.current || hasAnimatedCardsRef.current || statsLoading) return;
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return;
+
+    const cards = cardsContainerRef.current.children;
+    if (cards && cards.length > 0) {
+      hasAnimatedCardsRef.current = true;
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 14 },
+        {
+          opacity: 1,
+          y: 0,
+          stagger: 0.06,
+          duration: 0.5,
+          ease: 'power2.out',
+          clearProps: 'all', // Xóa sạch inline styles sau khi diễn hoạt
+        }
+      );
+    }
+  }, [statsLoading]);
 
   // ── RECENT ORDERS FILTER STATES ────────────────────────────────────────
   const [orderSearchKeyword, setOrderSearchKeyword] = useState('');
@@ -324,141 +354,218 @@ export const DashboardModule: React.FC = () => {
       {/* ───────────────────────────────────────────────────────────────── */}
       {/* 4 STAT CARDS                                                      */}
       {/* ───────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* 4 METRIC CARDS WITH REFINED VISUAL HIERARCHY & DATA-DRIVEN ANIMATIONS */}
+      <div ref={cardsContainerRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
-        {/* Metric 1: Revenue */}
-        <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+        {/* Metric 1: Revenue (Hero Metric) */}
+        <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-50/25 via-white to-white dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 shadow-sm space-y-3 relative overflow-hidden group">
           <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate max-w-[180px]" title={`Doanh thu (${period.label})`}>
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5" title={`Doanh thu (${period.label})`}>
+              <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               Doanh thu ({period.label})
             </span>
-            <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm shadow-emerald-500/10 shrink-0">
-              <DollarSign className="w-4 h-4" />
-            </div>
+            <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+              TRỌNG TÂM
+            </span>
           </div>
           {statsLoading || analyticsLoading ? (
             <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
-            <div className="font-display font-black text-3xl text-slate-900 dark:text-white">
-              {displayRevenue >= 1_000_000
-                ? `${(displayRevenue / 1_000_000).toFixed(1)}M ₫`
-                : `${displayRevenue.toLocaleString('vi-VN')} ₫`}
+            <div className="font-display font-black text-3xl sm:text-[32px] text-slate-900 dark:text-white tracking-tight">
+              <AnimatedNumber
+                value={displayRevenue}
+                formatter={(val) =>
+                  val >= 1_000_000
+                    ? `${(val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)}M ₫`
+                    : `${Math.round(val).toLocaleString('vi-VN')} ₫`
+                }
+              />
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
             <div className="flex items-center gap-1">
-              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+              <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold ${
                 revenueGrowth >= 0 
-                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
-                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                  ? 'text-emerald-600 dark:text-emerald-400' 
+                  : 'text-rose-600 dark:text-rose-400'
               }`}>
-                {revenueGrowth >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {Math.abs(revenueGrowth)}%
+                {revenueGrowth >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                {revenueGrowth >= 0 ? `+${revenueGrowth}%` : `${revenueGrowth}%`}
               </span>
-              <span className="text-slate-400 text-[11px]">vs kỳ trước</span>
+              <span className="text-slate-400 text-[11px] font-medium">so với kỳ trước</span>
             </div>
-            <span className="text-slate-500 dark:text-slate-400 text-[11px]">Tháng này: {orderStats.totalOrdersThisMonth} đơn</span>
+            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium">
+              Tháng này: {orderStats.totalOrdersThisMonth} đơn
+            </span>
           </div>
         </div>
 
         {/* Metric 2: Orders */}
         <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
           <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate max-w-[180px]" title={`Đơn hàng (${period.label})`}>
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5" title={`Đơn hàng (${period.label})`}>
+              <ShoppingBag className="w-3.5 h-3.5 text-slate-400" />
               Đơn hàng ({period.label})
             </span>
-            <div className="w-9 h-9 rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-sm shadow-blue-500/10 shrink-0">
-              <ShoppingBag className="w-4 h-4" />
-            </div>
           </div>
           {statsLoading || analyticsLoading ? (
             <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
             <div className="font-display font-black text-3xl text-slate-900 dark:text-white">
-              {displayOrders.toLocaleString('vi-VN')}
+              <AnimatedNumber
+                value={displayOrders}
+                formatter={(val) => Math.round(val).toLocaleString('vi-VN')}
+              />
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
             <div className="flex items-center gap-1">
-              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+              <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold ${
                 ordersGrowth >= 0 
-                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
-                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                  ? 'text-emerald-600 dark:text-emerald-400' 
+                  : 'text-rose-600 dark:text-rose-400'
               }`}>
-                {ordersGrowth >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {Math.abs(ordersGrowth)}%
+                {ordersGrowth >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                {ordersGrowth >= 0 ? `+${ordersGrowth}%` : `${ordersGrowth}%`}
               </span>
-              <span className="text-slate-400 text-[11px]">vs kỳ trước</span>
+              <span className="text-slate-400 text-[11px] font-medium">so với kỳ trước</span>
             </div>
-            <span className="text-amber-600 dark:text-amber-400 text-[11px]">Chờ duyệt: {orderStats.pendingOrders}</span>
+            <span className="text-amber-600 dark:text-amber-400 text-[11px] font-medium">
+              Chờ duyệt: {orderStats.pendingOrders}
+            </span>
           </div>
         </div>
 
         {/* Metric 3: Customers */}
         <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
           <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Tổng khách hàng</span>
-            <div className="w-9 h-9 rounded-2xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-sm shadow-purple-500/10">
-              <Users className="w-4 h-4" />
-            </div>
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-slate-400" />
+              Tổng khách hàng
+            </span>
           </div>
           {statsLoading ? (
             <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
             <div className="font-display font-black text-3xl text-slate-900 dark:text-white">
-              {customerStats.totalCustomers.toLocaleString('vi-VN')}
+              <AnimatedNumber
+                value={customerStats.totalCustomers}
+                formatter={(val) => Math.round(val).toLocaleString('vi-VN')}
+              />
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-[11px]">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Mới tuần này: {customerStats.newThisMonth}</span>
+          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-[11px] font-medium">
+              <span>Mới tuần này: <strong className="text-emerald-600 dark:text-emerald-400">{customerStats.newThisMonth}</strong></span>
             </div>
-            <span className="text-slate-400 text-[11px]">Khóa: {customerStats.blockedCount}</span>
+            <span className="text-slate-400 text-[11px] font-medium">Khóa: {customerStats.blockedCount}</span>
           </div>
         </div>
 
-        {/* Metric 4: Low Stock (CLICKABLE CARD TO OPEN ALERT MODAL) */}
+        {/* Metric 4: Low Stock & Out of Stock Alert (Actionable Alert Card) */}
         <div
           onClick={() => setIsLowStockModalOpen(true)}
-          className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3 cursor-pointer hover:border-rose-300 dark:hover:border-rose-700/80 hover:shadow-md hover:scale-[1.02] active:scale-[0.99] transition-all group relative"
+          className={`p-6 bg-white dark:bg-slate-900 rounded-3xl border shadow-sm space-y-3 cursor-pointer transition-all group relative ${
+            lowStockItems.length > 0
+              ? 'border-rose-300 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 hover:shadow-md'
+              : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+          }`}
           title="Nhấp vào để xem chi tiết các sản phẩm cảnh báo và điều chỉnh ngưỡng"
         >
           <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors flex items-center gap-1">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors flex items-center gap-1">
               Cảnh báo tồn kho
               <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
             </span>
-            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shadow-sm transition-transform group-hover:scale-110 ${
-              lowStockItems.length > 0
-                ? 'bg-rose-100 dark:bg-rose-950 text-rose-500'
-                : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600'
-            }`}>
-              <AlertTriangle className="w-4 h-4" />
-            </div>
+            {lowStockItems.length > 0 ? (
+              <span className="flex items-center gap-1 text-[11px] font-extrabold text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
+                Cần chú ý
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                An toàn
+              </span>
+            )}
           </div>
           {inventoryLoading ? (
             <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
             <div className={`font-display font-black text-3xl ${
-              lowStockItems.length > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
+              lowStockItems.length > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'
             }`}>
-              {lowStockItems.length} <span className="text-xs font-bold text-slate-400 font-sans">sản phẩm</span>
+              <AnimatedNumber
+                value={lowStockItems.length}
+                formatter={(val) => `${Math.round(val)}`}
+              /> <span className="text-xs font-bold text-slate-400 font-sans">sản phẩm</span>
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
             {outOfStockCount > 0 ? (
-              <span className="text-rose-600 text-[11px] font-black">🔴 {outOfStockCount} hết hàng (0)</span>
+              <span className="text-rose-600 dark:text-rose-400 text-[11px] font-black flex items-center gap-1">
+                🔴 {outOfStockCount} hết hàng
+              </span>
             ) : (
-              <span className="text-emerald-600 text-[11px] font-bold">✅ 0 hết hàng</span>
+              <span className="text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
+                ✅ 0 hết hàng
+              </span>
             )}
-            <span className="text-amber-600 text-[11px]">🟡 {nearOutOfStockCount} sắp hết</span>
+            <span className="text-amber-600 dark:text-amber-400 text-[11px] font-bold">
+              🟡 {nearOutOfStockCount} sắp hết
+            </span>
           </div>
         </div>
-
       </div>
 
+            {/* ───────────────────────────────────────────────────────────────── */}
+      {/* DASHBOARD SUB-TAB NAVIGATION                                      */}
       {/* ───────────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3 pt-2">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('analytics')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'analytics'
+                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Biểu đồ & Xu hướng</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('orders_conversion')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'orders_conversion'
+                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4" />
+            <span>Đơn hàng & Chuyển đổi</span>
+            {orderStats.pendingOrders > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] font-black">
+                {orderStats.pendingOrders}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <span className="hidden sm:inline text-xs text-slate-400 font-medium">
+          {activeTab === 'analytics'
+            ? 'Theo dõi doanh thu, phân bổ đơn và top sản phẩm'
+            : 'Quản lý đơn hàng phát sinh và hiệu suất chuyển đổi sản phẩm'}
+        </span>
+      </div>
+
+      {/* ── TAB 1: BIỂU ĐỒ & XU HƯỚNG ──────────────────────────────────── */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* ───────────────────────────────────────────────────────────────── */}
       {/* BIỂU ĐỒ DOANH THU THEO THỜI GIAN (AREA CHART FULL-WIDTH)           */}
       {/* ───────────────────────────────────────────────────────────────── */}
       <RevenueAreaChart
@@ -490,8 +597,13 @@ export const DashboardModule: React.FC = () => {
           loading={analyticsLoading}
         />
       </div>
+        </div>
+      )}
 
-      {/* ───────────────────────────────────────────────────────────────── */}
+      {/* ── TAB 2: ĐƠN HÀNG GẦN ĐÂY & HIỆU SUẤT CHUYỂN ĐỔI ────────────── */}
+      {activeTab === 'orders_conversion' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* ───────────────────────────────────────────────────────────────── */}
       {/* 3. ĐƠN HÀNG GẦN ĐÂY VỚI BỘ LỌC TÌM KIẾM & TRẠNG THÁI TIỆN LỢI      */}
       {/* ───────────────────────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-5">
@@ -651,6 +763,8 @@ export const DashboardModule: React.FC = () => {
         needsReviewList={productInsights?.needsReview ?? []}
         loading={catalogLoading}
       />
+        </div>
+      )}
 
       {/* ───────────────────────────────────────────────────────────────── */}
       {/* QUICK RESTOCK MODAL                                               */}

@@ -25,7 +25,8 @@ export interface RelatedProductDto {
   id: string;
   name: string;
   slug: string;
-  basePrice: number;
+  basePrice?: number;
+  price?: number;
   effectivePrice?: number;
   salePercent?: number;
   imageUrl?: string;
@@ -147,6 +148,16 @@ export const blogApi = {
     const formData = new FormData();
     formData.append('file', file);
     const res = await apiClient.post<{ url: string }>(`/admin/posts/${id}/cover-image`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  // Upload ?nh ho?c video d? nh�ng tr?c ti?p v�o n?i dung b�i vi?t
+  async uploadInlineMedia(file: File): Promise<{ url: string; resourceType: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<{ url: string; resourceType: string }>('/admin/posts/upload-media', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data;

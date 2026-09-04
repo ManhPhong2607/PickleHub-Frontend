@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Calendar } from 'lucide-react';
 import { DailyRevenuePointDto } from '@/lib/api/adminApi';
+import gsap from 'gsap';
 
 interface RevenueAreaChartProps {
   timeline: DailyRevenuePointDto[];
@@ -14,6 +15,80 @@ interface RevenueAreaChartProps {
   loading?: boolean;
 }
 
+/**
+ * Thuật toán nội suy Monotone Cubic Spline (Fritsch-Carlson)
+ * Đảm bảo:
+ * 1. Làm mượt tuyệt đối các điểm đỉnh nhọn (không tạo hình tam giác)
+ * 2. Không bị overshoot/lõm xuống dưới mức 0 (zero baseline)
+ * 3. Tiếp tuyến tại điểm cực đại địa phương luôn nằm ngang (horizontal dome)
+ */
+function getMonotoneSplinePath(points: { x: number; y: number }[]): string {
+  const n = points.length;
+  if (n === 0) return '';
+  if (n === 1) return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  if (n === 2) {
+    return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)} L ${points[1].x.toFixed(2)} ${points[1].y.toFixed(2)}`;
+  }
+
+  // 1. Tính toán secants (độ dốc từng đoạn)
+  const dxs: number[] = [];
+  const dys: number[] = [];
+  const ms: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const dx = points[i + 1].x - points[i].x;
+    const dy = points[i + 1].y - points[i].y;
+    dxs.push(dx);
+    dys.push(dy);
+    ms.push(dx === 0 ? 0 : dy / dx);
+  }
+
+  // 2. Tính tiếp tuyến ban đầu (Fritsch-Carlson tangents)
+  const tangents: number[] = [ms[0]];
+  for (let i = 1; i < n - 1; i++) {
+    const mPrev = ms[i - 1];
+    const mCur = ms[i];
+    if (mPrev * mCur <= 0) {
+      tangents.push(0); // Đỉnh hoặc đáy địa phương -> tiếp tuyến nằm ngang hoàn hảo
+    } else {
+      tangents.push((mPrev + mCur) / 2);
+    }
+  }
+  tangents.push(ms[ms.length - 1]);
+
+  // 3. Giới hạn tiếp tuyến để ngăn chặn overshoot
+  for (let i = 0; i < n - 1; i++) {
+    if (dys[i] === 0) {
+      tangents[i] = 0;
+      tangents[i + 1] = 0;
+    } else {
+      const alpha = tangents[i] / ms[i];
+      const beta = tangents[i + 1] / ms[i];
+      const dist = alpha * alpha + beta * beta;
+      if (dist > 9) {
+        const tau = 3 / Math.sqrt(dist);
+        tangents[i] = tau * alpha * ms[i];
+        tangents[i + 1] = tau * beta * ms[i];
+      }
+    }
+  }
+
+  // 4. Sinh chuỗi Cubic Bezier SVG
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const dx = dxs[i];
+    const cp1x = p1.x + dx / 3;
+    const cp1y = p1.y + (tangents[i] * dx) / 3;
+    const cp2x = p2.x - dx / 3;
+    const cp2y = p2.y - (tangents[i + 1] * dx) / 3;
+
+    path += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+
+  return path;
+}
+
 export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
   timeline,
   totalRevenue,
@@ -21,27 +96,38 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
   growthPercent,
   days,
   periodLabel,
-  loading = false
+  loading = false,
 }) => {
   const [hoveredPoint, setHoveredPoint] = useState<DailyRevenuePointDto | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+  const pathRef = useRef<SVGPathElement>(null);
+  const areaRef = useRef<SVGPathElement>(null);
+
   // SVG dimensions
   const width = 800;
   const height = 260;
-  const padding = { top: 20, right: 20, bottom: 40, left: 65 };
+  const padding = { top: 25, right: 25, bottom: 40, left: 65 };
 
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
-  // Max value calculation
+  // Tính toán scale trục Y thông minh: làm tròn số đẹp + tạo 18% khoảng thở headroom
   const maxRevenue = useMemo(() => {
-    if (!timeline || timeline.length === 0) return 1_000_000;
-    const max = Math.max(...timeline.map(p => p.revenue));
-    return max > 0 ? max * 1.15 : 1_000_000; // 15% headroom
+    if (!timeline || timeline.length === 0) return 5_000_000;
+    const maxVal = Math.max(...timeline.map((p) => p.revenue), 0);
+    if (maxVal === 0) return 5_000_000;
+
+    // Headroom 18%
+    const targetMax = maxVal * 1.18;
+
+    // Làm tròn lên số đẹp theo bậc thập phân
+    const magnitude = Math.pow(10, Math.floor(Math.log10(targetMax)));
+    const step = magnitude >= 1_000_000 ? 1_000_000 : magnitude >= 100_000 ? 500_000 : 100_000;
+    return Math.ceil(targetMax / step) * step;
   }, [timeline]);
 
-  // Generate SVG Points
+  // Chuẩn hóa danh sách điểm (Đảm bảo trục X có khoảng cách đều đặn)
   const points = useMemo(() => {
     if (!timeline || timeline.length === 0) return [];
     const count = timeline.length;
@@ -52,51 +138,97 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
     });
   }, [timeline, maxRevenue, chartWidth, chartHeight, padding.left, padding.top]);
 
-  // Smooth Bezier Curve Path
+  // Tạo đường path cong mượt Monotone Spline & vùng diện tích
   const { pathD, areaD } = useMemo(() => {
     if (points.length === 0) return { pathD: '', areaD: '' };
+
     if (points.length === 1) {
       const p = points[0];
+      const bottomY = padding.top + chartHeight;
       return {
-        pathD: `M ${p.x} ${p.y} L ${p.x + 1} ${p.y}`,
-        areaD: `M ${p.x} ${padding.top + chartHeight} L ${p.x} ${p.y} L ${p.x + 1} ${p.y} L ${p.x + 1} ${padding.top + chartHeight} Z`
+        pathD: `M ${padding.left} ${p.y} L ${padding.left + chartWidth} ${p.y}`,
+        areaD: `M ${padding.left} ${bottomY} L ${padding.left} ${p.y} L ${padding.left + chartWidth} ${p.y} L ${padding.left + chartWidth} ${bottomY} Z`,
       };
     }
 
-    let d = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 0; i < points.length - 1; i++) {
-      const current = points[i];
-      const next = points[i + 1];
-      const controlX = (current.x + next.x) / 2;
-      d += ` C ${controlX} ${current.y}, ${controlX} ${next.y}, ${next.x} ${next.y}`;
-    }
-
+    const splinePath = getMonotoneSplinePath(points);
     const firstPoint = points[0];
     const lastPoint = points[points.length - 1];
     const bottomY = padding.top + chartHeight;
-    const area = `${d} L ${lastPoint.x} ${bottomY} L ${firstPoint.x} ${bottomY} Z`;
+    const area = `${splinePath} L ${lastPoint.x.toFixed(2)} ${bottomY} L ${firstPoint.x.toFixed(2)} ${bottomY} Z`;
 
-    return { pathD: d, areaD: area };
-  }, [points, chartHeight, padding.top]);
+    return { pathD: splinePath, areaD: area };
+  }, [points, chartHeight, chartWidth, padding.left, padding.top]);
 
-  // Format currency for Y axis ticks
+  // GSAP Draw-in Animation: Vẽ đường nét mượt mà khi load lần đầu hoặc khi đổi dữ liệu
+  useEffect(() => {
+    const path = pathRef.current;
+    const area = areaRef.current;
+    if (!path || !pathD) return;
+
+    // Kiểm tra cài đặt prefers-reduced-motion của người dùng
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      gsap.set(path, { strokeDashoffset: 0, opacity: 1 });
+      if (area) gsap.set(area, { opacity: 1 });
+      return;
+    }
+
+    try {
+      const length = path.getTotalLength();
+      if (length > 0) {
+        gsap.set(path, {
+          strokeDasharray: length,
+          strokeDashoffset: length,
+          opacity: 1,
+        });
+        if (area) {
+          gsap.set(area, { opacity: 0 });
+        }
+
+        const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+        tl.to(path, {
+          strokeDashoffset: 0,
+          duration: 1.1,
+        }).to(
+          area,
+          {
+            opacity: 1,
+            duration: 0.5,
+            ease: 'power1.inOut',
+          },
+          '-=0.4'
+        );
+
+        return () => {
+          tl.kill();
+        };
+      }
+    } catch {
+      // Fallback an toàn nếu trình duyệt không hỗ trợ getTotalLength trên SVG render ảo
+      gsap.set(path, { strokeDashoffset: 0, opacity: 1 });
+      if (area) gsap.set(area, { opacity: 1 });
+    }
+  }, [pathD]);
+
+  // Format tiền tệ cho các mốc trục Y
   const formatYTick = (val: number) => {
     if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(1)}B`;
-    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)}M`;
     if (val >= 1_000) return `${(val / 1_000).toFixed(0)}k`;
     return `${val}`;
   };
 
   const yTicks = useMemo(() => {
-    return [0, maxRevenue * 0.33, maxRevenue * 0.66, maxRevenue];
+    return [0, maxRevenue * 0.333, maxRevenue * 0.666, maxRevenue];
   }, [maxRevenue]);
 
-  // Filter X ticks so we don't overcrowd or collide at boundaries
+  // Lọc chỉ số ngày trên trục X sao cho không bị đè chữ nhau
   const xTickIndices = useMemo(() => {
     const total = points.length;
     if (total <= 7) return points.map((_, i) => i);
 
-    const step = total <= 15 ? 2 : total <= 31 ? 5 : 10;
+    const step = total <= 14 ? 2 : total <= 31 ? 5 : 10;
     const indices: number[] = [];
 
     for (let i = 0; i < total; i += step) {
@@ -127,8 +259,7 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
-      
+    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6 transition-colors">
       {/* Header Metrics */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-5">
         <div>
@@ -152,11 +283,13 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
               <span className="font-display font-black text-2xl text-slate-900 dark:text-white">
                 {totalRevenue.toLocaleString('vi-VN')} ₫
               </span>
-              <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-black ${
-                isPositive 
-                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' 
-                  : 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400'
-              }`}>
+              <span
+                className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-black ${
+                  isPositive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400'
+                    : 'bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-400'
+                }`}
+              >
                 {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {Math.abs(growthPercent)}%
               </span>
@@ -183,18 +316,15 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
           </div>
         ) : (
           <div className="relative overflow-visible">
-            <svg
-              viewBox={`0 0 ${width} ${height}`}
-              className="w-full h-auto overflow-visible select-none"
-            >
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible select-none">
               <defs>
-                <linearGradient id="emeraldGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-                  <stop offset="60%" stopColor="#10b981" stopOpacity="0.08" />
+                <linearGradient id="emeraldSmoothGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.32" />
+                  <stop offset="65%" stopColor="#10b981" stopOpacity="0.06" />
                   <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
                 </linearGradient>
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#10b981" floodOpacity="0.3" />
+                <filter id="smoothGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="3" stdDeviation="3.5" floodColor="#10b981" floodOpacity="0.25" />
                 </filter>
               </defs>
 
@@ -225,19 +355,27 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
                 );
               })}
 
-              {/* Area Gradient Fill */}
-              {areaD && <path d={areaD} fill="url(#emeraldGradient)" />}
+              {/* Area Gradient Fill (Fade-in with GSAP) */}
+              {areaD && (
+                <path
+                  ref={areaRef}
+                  d={areaD}
+                  fill="url(#emeraldSmoothGradient)"
+                  className="transition-opacity duration-300"
+                />
+              )}
 
-              {/* Line Stroke */}
+              {/* Line Stroke (Monotone Cubic Spline with GSAP Draw-in) */}
               {pathD && (
                 <path
+                  ref={pathRef}
                   d={pathD}
                   fill="none"
                   stroke="#10b981"
-                  strokeWidth="3.5"
+                  strokeWidth="3.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  filter="url(#glow)"
+                  filter="url(#smoothGlow)"
                 />
               )}
 
@@ -258,9 +396,10 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
                 );
               })}
 
-              {/* Interactive Crosshair & Points */}
+              {/* Interactive Points & Guidelines */}
               {points.map((pt, idx) => {
                 const isHovered = hoveredIndex === idx;
+                const isSpikePoint = pt.data.revenue > 0;
                 return (
                   <g key={idx}>
                     {/* Vertical guideline on hover */}
@@ -276,20 +415,20 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
                       />
                     )}
 
-                    {/* Point Circle */}
+                    {/* Point Circle (tinh gọn) */}
                     <circle
                       cx={pt.x}
                       cy={pt.y}
-                      r={isHovered ? 6.5 : (pt.data.revenue > 0 ? 3.5 : 2)}
-                      fill={isHovered ? '#10b981' : '#ffffff'}
-                      stroke="#10b981"
-                      strokeWidth={isHovered ? 3 : 2}
+                      r={isHovered ? 6 : isSpikePoint ? 3.5 : 2}
+                      fill={isHovered ? '#10b981' : isSpikePoint ? '#10b981' : '#ffffff'}
+                      stroke={isHovered ? '#ffffff' : '#10b981'}
+                      strokeWidth={isHovered ? 2.5 : 1.5}
                       className="transition-all duration-150 cursor-pointer"
                     />
 
-                    {/* Invisible Hitbox for easier hovering */}
+                    {/* Hitbox để rê chuột dễ dàng */}
                     <rect
-                      x={pt.x - (chartWidth / points.length) / 2}
+                      x={pt.x - chartWidth / points.length / 2}
                       y={padding.top}
                       width={Math.max(chartWidth / points.length, 20)}
                       height={chartHeight + 20}
@@ -309,7 +448,7 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
               })}
             </svg>
 
-            {/* Floating Tooltip Box with Boundary-Aware Positioning */}
+            {/* Floating Tooltip Box */}
             {hoveredPoint && hoveredIndex !== null && points[hoveredIndex] && (() => {
               const pt = points[hoveredIndex];
               const xRatio = pt.x / width;
@@ -348,7 +487,6 @@ export const RevenueAreaChart: React.FC<RevenueAreaChartProps> = ({
           </div>
         )}
       </div>
-
     </div>
   );
 };

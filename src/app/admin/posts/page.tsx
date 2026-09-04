@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   FileText, Plus, Search, Filter, Edit, Trash2, CheckCircle2,
   Archive, Globe, Eye, Upload, Image as ImageIcon, X, ArrowUpRight,
-  Sparkles, RefreshCw, Layers, Tag, Hash, AlignLeft, AlertCircle
+  Sparkles, RefreshCw, Layers, Tag, Hash, AlignLeft, AlertCircle,
+  Video, Link2, ShoppingBag, ExternalLink, Calendar, User, Clock
 } from 'lucide-react';
 import { blogApi, PostListDto, PostCategoryDto, CreatePostDto, UpdatePostDto, PostDetailDto } from '@/lib/api/blogApi';
+import { catalogApi } from '@/lib/api/catalogApi';
+import BlogContentRenderer from '@/components/blog/BlogContentRenderer';
 
 export default function AdminPostsPage() {
   const [activeTab, setActiveTab] = useState<'posts' | 'categories'>('posts');
@@ -22,6 +25,10 @@ export default function AdminPostsPage() {
   const [page, setPage] = useState<number>(1);
   const [totalItems, setTotalItems] = useState<number>(0);
 
+  // Available Products for related products picker
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+  const [productSearch, setProductSearch] = useState<string>('');
+
   // Post Modal states
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -32,10 +39,22 @@ export default function AdminPostsPage() {
     content: '',
     seoTitle: '',
     seoDescription: '',
+    relatedProductIds: [],
   });
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string>('');
+
+  // Inline Media upload state & Textarea cursor tracking
+  const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const cursorPositionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  // Preview Modal states
+  const [previewPost, setPreviewPost] = useState<PostDetailDto | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
 
   // Category Modal states
   const [isCatModalOpen, setIsCatModalOpen] = useState<boolean>(false);
@@ -54,7 +73,7 @@ export default function AdminPostsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [postRes, catRes] = await Promise.all([
+      const [postRes, catRes, prodRes] = await Promise.all([
         blogApi.getAdminPosts({
           keyword: keyword.trim() || undefined,
           status: statusFilter || undefined,
@@ -63,11 +82,13 @@ export default function AdminPostsPage() {
           pageSize: 10,
         }),
         blogApi.getCategories(),
+        catalogApi.getProducts().catch(() => []),
       ]);
 
       setPosts(postRes.items || []);
       setTotalItems(postRes.totalItems || 0);
       setCategories(catRes || []);
+      setAvailableProducts(prodRes || []);
       if (catRes && catRes.length > 0 && !formData.categoryId) {
         setFormData((prev) => ({ ...prev, categoryId: catRes[0].id }));
       }
@@ -94,9 +115,12 @@ export default function AdminPostsPage() {
       content: '',
       seoTitle: '',
       seoDescription: '',
+      relatedProductIds: [],
     });
     setCoverFile(null);
     setCoverPreview('');
+    setProductSearch('');
+    cursorPositionRef.current = { start: 0, end: 0 };
     setIsModalOpen(true);
   };
 
@@ -111,12 +135,28 @@ export default function AdminPostsPage() {
         content: postDetail.content,
         seoTitle: postDetail.seoTitle || '',
         seoDescription: postDetail.seoDescription || '',
+        relatedProductIds: postDetail.relatedProductIds || [],
       });
       setCoverPreview(postDetail.coverImageUrl || '');
       setCoverFile(null);
+      setProductSearch('');
+      cursorPositionRef.current = { start: postDetail.content.length, end: postDetail.content.length };
       setIsModalOpen(true);
     } catch (err) {
       alert('Không thể tải thông tin bài viết để chỉnh sửa.');
+    }
+  };
+
+  const handleOpenPreview = async (id: string) => {
+    setLoadingPreview(true);
+    try {
+      const postDetail = await blogApi.getAdminPostById(id);
+      setPreviewPost(postDetail);
+      setIsPreviewOpen(true);
+    } catch (err) {
+      alert('Không thể tải dữ liệu bài viết để xem trước.');
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
@@ -177,6 +217,125 @@ export default function AdminPostsPage() {
       loadData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Lỗi khi xóa bài viết.');
+    }
+  };
+
+  // ==========================================
+  // Cập nhật vị trí con trỏ trong ô nội dung
+  // ==========================================
+  const updateCursorPosition = () => {
+    if (textareaRef.current) {
+      cursorPositionRef.current = {
+        start: textareaRef.current.selectionStart,
+        end: textareaRef.current.selectionEnd,
+      };
+    }
+  };
+
+  // Hàm chèn đoạn Markdown/HTML chính xác tại vị trí con trỏ
+  const insertMediaSnippet = (snippet: string) => {
+    const textarea = textareaRef.current;
+    const currentContent = formData.content || '';
+    const { start, end } = cursorPositionRef.current;
+
+    // Đảm bảo đoạn mã chèn có khoảng cách dòng phù hợp
+    const formattedSnippet = `\n\n${snippet.trim()}\n\n`;
+
+    let newContent = '';
+    let newCursorPos = 0;
+
+    // Nếu con trỏ đang ở trong phạm vi văn bản
+    if (start >= 0 && end >= start && start <= currentContent.length) {
+      const before = currentContent.substring(0, start);
+      const after = currentContent.substring(end);
+      newContent = `${before}${formattedSnippet}${after}`;
+      newCursorPos = start + formattedSnippet.length;
+    } else {
+      // Mặc định chèn vào cuối bài nếu chưa có vị trí con trỏ
+      newContent = currentContent ? `${currentContent}${formattedSnippet}` : formattedSnippet.trim();
+      newCursorPos = newContent.length;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      content: newContent,
+    }));
+
+    // Focus lại vào textarea và đặt con trỏ ngay sau đoạn mã vừa chèn
+    setTimeout(() => {
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        cursorPositionRef.current = { start: newCursorPos, end: newCursorPos };
+      }
+    }, 50);
+  };
+
+  // ==========================================
+  // Inline Media Handlers (Ảnh & Video)
+  // ==========================================
+  const handleUploadInlineMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingMedia(true);
+    try {
+      const res = await blogApi.uploadInlineMedia(file);
+      let snippet = '';
+      if (res.resourceType === 'video' || file.type.startsWith('video/')) {
+        snippet = `<video controls class="w-full rounded-2xl my-4 shadow-md" src="${res.url}"></video>`;
+      } else {
+        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+        snippet = `![${nameWithoutExt}](${res.url})`;
+      }
+
+      // Chèn ngay tại vị trí con trỏ người dùng đã đặt
+      insertMediaSnippet(snippet);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Lỗi khi tải ảnh/video lên Cloudinary.');
+    } finally {
+      setUploadingMedia(false);
+      if (mediaInputRef.current) mediaInputRef.current.value = '';
+    }
+  };
+
+  const handleInsertExternalMedia = () => {
+    const url = prompt('Nhập URL hình ảnh hoặc URL video (YouTube / MP4):');
+    if (!url || !url.trim()) return;
+    const trimmed = url.trim();
+    let snippet = '';
+
+    if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
+      snippet = trimmed;
+    } else if (trimmed.match(/\.(mp4|webm|mov)(\?.*)?$/i)) {
+      snippet = `<video controls class="w-full rounded-2xl my-4 shadow-md" src="${trimmed}"></video>`;
+    } else {
+      snippet = `![Hình ảnh minh họa](${trimmed})`;
+    }
+
+    // Chèn ngay tại vị trí con trỏ người dùng đã đặt
+    insertMediaSnippet(snippet);
+  };
+
+  // ==========================================
+  // Related Products Selection Handlers
+  // ==========================================
+  const toggleSelectProduct = (productId: string) => {
+    const current = formData.relatedProductIds || [];
+    if (current.includes(productId)) {
+      setFormData({
+        ...formData,
+        relatedProductIds: current.filter((id) => id !== productId),
+      });
+    } else {
+      if (current.length >= 6) {
+        alert('Chỉ nên gắn tối đa 6 sản phẩm liên quan cho mỗi bài viết để tối ưu trải nghiệm người đọc.');
+        return;
+      }
+      setFormData({
+        ...formData,
+        relatedProductIds: [...current, productId],
+      });
     }
   };
 
@@ -435,14 +594,16 @@ export default function AdminPostsPage() {
 
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <Link
-                              href={`/blog/${post.slug}`}
-                              target="_blank"
-                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
-                              title="Xem trước bài viết trên web"
+                            {/* NÚT XEM TRƯỚC (PREVIEW MODAL) */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPreview(post.id)}
+                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:text-emerald-600 dark:hover:text-emerald-400 text-slate-600 dark:text-slate-300 transition-colors"
+                              title="Xem trước bài viết (Preview Modal)"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                            </Link>
+                            </button>
+
                             <button
                               onClick={() => handlePublish(post.id)}
                               className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400"
@@ -565,7 +726,7 @@ export default function AdminPostsPage() {
       {/* ========================================================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-8 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-8 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-4">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white font-display">
                 {editingPostId ? 'Chỉnh sửa Bài viết' : 'Tạo Bài viết Mới'}
@@ -578,7 +739,8 @@ export default function AdminPostsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Tiêu đề */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Tiêu đề bài viết *</label>
                 <input
@@ -591,6 +753,7 @@ export default function AdminPostsPage() {
                 />
               </div>
 
+              {/* Danh mục & Ảnh bìa */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Danh mục bài viết *</label>
@@ -606,29 +769,31 @@ export default function AdminPostsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Ảnh bìa bài viết</label>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Ảnh bìa bài viết (Cover Image)</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setCoverFile(e.target.files[0]);
-                        setCoverPreview(URL.createObjectURL(e.target.files[0]));
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setCoverFile(file);
+                        setCoverPreview(URL.createObjectURL(file));
                       }
                     }}
-                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer"
+                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-950 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer"
                   />
                   {coverPreview && (
-                    <div className="mt-2 flex items-center gap-3 p-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <div className="mt-2 flex items-center gap-2">
                       <div className="w-16 h-12 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0">
                         <img src={coverPreview} alt="Preview" className="w-full h-full object-cover" />
                       </div>
-                      <span className="text-[11px] text-slate-500 font-medium">Ảnh bìa được chọn</span>
+                      <span className="text-[11px] text-slate-500 font-medium">Ảnh bìa đã chọn</span>
                     </div>
                   )}
                 </div>
               </div>
 
+              {/* Tóm tắt */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Tóm tắt ngắn (Summary)</label>
                 <textarea
@@ -640,16 +805,212 @@ export default function AdminPostsPage() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Nội dung chi tiết (Hỗ trợ Markdown) *</label>
+              {/* KHỐI NỘI DUNG VÀ TOOLBAR CHÈN MEDIA (ẢNH & VIDEO) VÀO VỊ TRÍ CON TRỎ */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Nội dung chi tiết (Hỗ trợ Markdown & Media) *
+                    </label>
+                    <p className="text-[10px] text-slate-400 italic">
+                      💡 Click chuột vào vị trí bất kỳ trong ô nội dung bên dưới, ảnh hoặc video sẽ được chèn chính xác tại điểm con trỏ đó.
+                    </p>
+                  </div>
+
+                  {/* Thanh công cụ chèn Ảnh/Video */}
+                  <div className="flex items-center gap-1.5">
+                    {/* Input file ẩn cho media */}
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      accept="image/*,video/mp4,video/webm,video/quicktime"
+                      onChange={handleUploadInlineMedia}
+                      className="hidden"
+                    />
+
+                    <button
+                      type="button"
+                      disabled={uploadingMedia}
+                      onClick={() => {
+                        updateCursorPosition();
+                        mediaInputRef.current?.click();
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] flex items-center gap-1.5 transition-colors shadow-sm"
+                      title="Tải ảnh hoặc video từ máy tính và chèn vào đúng vị trí con trỏ chuột"
+                    >
+                      {uploadingMedia ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                          <span>Đang upload...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+                          <Video className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Chèn Ảnh/Video vào con trỏ</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateCursorPosition();
+                        handleInsertExternalMedia();
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] flex items-center gap-1.5 transition-colors shadow-sm"
+                      title="Chèn link hình ảnh hoặc link YouTube/MP4 vào đúng vị trí con trỏ chuột"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      <span>Chèn Link/YouTube</span>
+                    </button>
+                  </div>
+                </div>
+
                 <textarea
-                  rows={8}
+                  ref={textareaRef}
+                  rows={9}
                   required
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="Viết nội dung bài viết bằng Markdown..."
-                  className="w-full px-4 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-mono outline-none focus:border-emerald-500 text-slate-900 dark:text-white"
+                  onClick={updateCursorPosition}
+                  onKeyUp={updateCursorPosition}
+                  onSelect={updateCursorPosition}
+                  onFocus={updateCursorPosition}
+                  onChange={(e) => {
+                    setFormData({ ...formData, content: e.target.value });
+                    updateCursorPosition();
+                  }}
+                  placeholder="Viết nội dung bài viết bằng Markdown... Bạn có thể click chuột vào bất kỳ đoạn nào trong bài rồi bấm nút 'Chèn Ảnh/Video' để chèn ảnh/video ngay tại đó."
+                  className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-mono outline-none focus:border-emerald-500 text-slate-900 dark:text-white leading-relaxed"
                 />
+              </div>
+
+              {/* KHỐI CHỌN SẢN PHẨM LIÊN QUAN (RELATED PRODUCTS) */}
+              <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                    <label className="text-xs font-bold text-slate-900 dark:text-white">
+                      Gắn sản phẩm liên quan giới thiệu trong bài
+                    </label>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    Đã chọn: <strong className="text-emerald-600 font-bold">{(formData.relatedProductIds || []).length}</strong> sản phẩm
+                  </span>
+                </div>
+
+                {/* Search input lọc sản phẩm */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Tìm kiếm sản phẩm theo tên để gắn vào bài..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-emerald-500 text-slate-800 dark:text-slate-200"
+                  />
+                </div>
+
+                {/* Danh sách chip sản phẩm đã chọn */}
+                {(formData.relatedProductIds || []).length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {(formData.relatedProductIds || []).map((pId) => {
+                      const prod = availableProducts.find((p) => p.id === pId);
+                      return (
+                        <span
+                          key={pId}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-xs font-semibold border border-emerald-300 dark:border-emerald-800 shadow-sm"
+                        >
+                          <img
+                            src={prod?.thumbnailUrl || prod?.imageUrl || '/images/paddle.png'}
+                            alt=""
+                            className="w-4 h-4 object-cover rounded-md"
+                          />
+                          <span className="truncate max-w-[150px]">{prod?.name || 'Sản phẩm đã chọn'}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectProduct(pId)}
+                            className="p-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-800 rounded-md text-emerald-700 dark:text-emerald-300"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Danh sách sản phẩm khả dụng để chọn */}
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {availableProducts
+                    .filter((p) =>
+                      productSearch.trim()
+                        ? p.name.toLowerCase().includes(productSearch.toLowerCase())
+                        : true
+                    )
+                    .slice(0, 15)
+                    .map((p) => {
+                      const isSelected = (formData.relatedProductIds || []).includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => toggleSelectProduct(p.id)}
+                          className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800'
+                              : 'hover:bg-white dark:hover:bg-slate-900 border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <img
+                              src={p.thumbnailUrl || p.imageUrl || '/images/paddle.png'}
+                              alt={p.name}
+                              className="w-7 h-7 rounded-lg object-contain bg-slate-100 dark:bg-slate-800 p-0.5 shrink-0"
+                            />
+                            <div className="truncate">
+                              <p className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate">
+                                {p.name}
+                              </p>
+                              <p className="text-[10px] text-emerald-600 font-extrabold">
+                                {(p.effectivePrice || p.price || p.basePrice || 0).toLocaleString('vi-VN')} ₫
+                              </p>
+                            </div>
+                          </div>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg shrink-0 ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          }`}>
+                            {isSelected ? 'Đã chọn' : '+ Thêm'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* SEO Tags */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">SEO Title</label>
+                  <input
+                    type="text"
+                    value={formData.seoTitle || ''}
+                    onChange={(e) => setFormData({ ...formData, seoTitle: e.target.value })}
+                    placeholder="Tiêu đề hiển thị trên Google..."
+                    className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs outline-none focus:border-emerald-500 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">SEO Description</label>
+                  <input
+                    type="text"
+                    value={formData.seoDescription || ''}
+                    onChange={(e) => setFormData({ ...formData, seoDescription: e.target.value })}
+                    placeholder="Mô tả tóm tắt cho công cụ tìm kiếm..."
+                    className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs outline-none focus:border-emerald-500 text-slate-900 dark:text-white"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200/80 dark:border-slate-800">
@@ -670,6 +1031,129 @@ export default function AdminPostsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* PREVIEW POST MODAL (XEM TRƯỚC BÀI VIẾT TẠI ADMIN)                          */}
+      {/* ========================================================================= */}
+      {isPreviewOpen && previewPost && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-8 max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-extrabold text-xs">
+                  {previewPost.categoryName}
+                </span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                  previewPost.status === 'Published'
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : 'bg-amber-500/10 text-amber-600'
+                }`}>
+                  {previewPost.status === 'Published' ? 'Đã xuất bản' : previewPost.status === 'Archived' ? 'Đã lưu trữ' : 'Bản nháp'}
+                </span>
+                <span className="text-xs text-slate-400 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {previewPost.publishedAt ? new Date(previewPost.publishedAt).toLocaleDateString('vi-VN') : 'Chưa xuất bản'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/blog/${previewPost.slug}`}
+                  target="_blank"
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  title="Mở bài viết trên trang web ngoài"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Xem trang công khai</span>
+                </Link>
+                <button
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Cover Banner */}
+            {previewPost.coverImageUrl && (
+              <div className="relative h-64 sm:h-80 rounded-3xl overflow-hidden bg-slate-100 dark:bg-slate-800 p-4 flex items-center justify-center border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <img
+                  src={previewPost.coverImageUrl}
+                  alt={previewPost.title}
+                  className="max-h-full max-w-full object-contain rounded-2xl drop-shadow-md"
+                />
+              </div>
+            )}
+
+            {/* Title & Summary */}
+            <div className="space-y-3">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white font-display leading-tight">
+                {previewPost.title}
+              </h1>
+              {previewPost.summary && (
+                <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 italic border-l-3 border-emerald-500 pl-4 py-1 leading-relaxed">
+                  {previewPost.summary}
+                </p>
+              )}
+            </div>
+
+            {/* Rich Content Renderer */}
+            <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
+              <BlogContentRenderer content={previewPost.content} />
+            </div>
+
+            {/* Related Products Section in Preview */}
+            {previewPost.relatedProducts && previewPost.relatedProducts.length > 0 && (
+              <div className="bg-emerald-50/60 dark:bg-emerald-950/30 rounded-3xl p-5 sm:p-6 border border-emerald-200/60 dark:border-emerald-900/50 space-y-3 mt-6">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    Sản phẩm được giới thiệu trong bài viết
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {previewPost.relatedProducts.map((p: any) => {
+                    const displayPrice = p.effectivePrice || p.price || p.basePrice || 0;
+                    return (
+                      <div
+                        key={p.id}
+                        className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3"
+                      >
+                        <img
+                          src={p.imageUrl || '/images/paddle.png'}
+                          alt={p.name}
+                          className="w-12 h-12 object-contain rounded-xl bg-slate-50 dark:bg-slate-800 p-1 shrink-0"
+                        />
+                        <div className="truncate space-y-0.5">
+                          <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                            {p.name}
+                          </h4>
+                          <p className="font-extrabold text-xs text-emerald-600">
+                            {displayPrice.toLocaleString('vi-VN')} ₫
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end border-t border-slate-200/80 dark:border-slate-800 pt-4">
+              <button
+                onClick={() => setIsPreviewOpen(false)}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-2xl transition-all shadow-md"
+              >
+                Đóng xem trước
+              </button>
+            </div>
           </div>
         </div>
       )}
