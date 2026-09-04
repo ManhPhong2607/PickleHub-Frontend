@@ -544,7 +544,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           {/* High-Res Bright Display Image overlaid with liquid wave */}
           <div className="absolute inset-0 z-0 overflow-hidden">
             <img
-              src={isLogin ? '/images/login_modal.png' : '/images/SignUp.png'}
+              src={isLogin ? '/images/Login_modal.png' : '/images/SignUp.png'}
               alt="PickleHub Display Graphic"
               className="w-full h-full object-cover opacity-90 brightness-110 contrast-105 transition-all duration-700 transform hover:scale-105"
             />
