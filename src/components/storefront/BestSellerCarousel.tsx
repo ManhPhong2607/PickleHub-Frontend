@@ -3,61 +3,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Flame, ChevronLeft, ChevronRight, ArrowRight, ShoppingBag } from 'lucide-react';
-import { Product, ProductVariantItem } from '@/types';
+import { Product } from '@/types';
 import { catalogApi } from '@/lib/api/catalogApi';
 import { useCartStore } from '@/store/useCartStore';
 import { QuickAddModal } from '@/components/common/QuickAddModal';
-
-const COLOR_MAP: Record<string, string> = {
-  'đen': '#111827',
-  'den': '#111827',
-  'black': '#111827',
-  'carbon': '#1f2937',
-  'trắng': '#FFFFFF',
-  'trang': '#FFFFFF',
-  'white': '#FFFFFF',
-  'hồng': '#F472B6',
-  'hong': '#F472B6',
-  'pink': '#F472B6',
-  'đỏ': '#EF4444',
-  'do': '#EF4444',
-  'red': '#EF4444',
-  'xanh navy': '#1E3A8A',
-  'navy': '#1E3A8A',
-  'xanh dương': '#3B82F6',
-  'xanh duong': '#3B82F6',
-  'blue': '#3B82F6',
-  'xanh lá': '#10B981',
-  'xanh la': '#10B981',
-  'green': '#10B981',
-  'vàng': '#F59E0B',
-  'vang': '#F59E0B',
-  'yellow': '#F59E0B',
-  'cam': '#F97316',
-  'orange': '#F97316',
-  'tím': '#8B5CF6',
-  'tim': '#8B5CF6',
-  'purple': '#8B5CF6',
-  'bạc': '#CBD5E1',
-  'silver': '#CBD5E1',
-  'xám': '#64748B',
-  'xam': '#64748B',
-  'gray': '#64748B',
-  'grey': '#64748B',
-  'nâu': '#78350F',
-  'brown': '#78350F',
-};
-
-function resolveColorHex(val: string): string {
-  if (!val) return '#94A3B8';
-  const lower = val.toLowerCase().trim();
-  if (COLOR_MAP[lower]) return COLOR_MAP[lower];
-  for (const [key, hex] of Object.entries(COLOR_MAP)) {
-    if (lower.includes(key)) return hex;
-  }
-  if (/^#([0-9A-F]{3}){1,2}$/i.test(val)) return val;
-  return '#475569';
-}
 
 function matchesCategory(p: Product, targetCat: string): boolean {
   const cat = (p.category || '').toLowerCase();
@@ -84,35 +33,8 @@ const CATEGORY_DEFINITIONS = [
 const BestSellerCard: React.FC<{ product: Product }> = ({ product }) => {
   const { addItem } = useCartStore();
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [selectedVariantIndex, setSelectedVariantIndex] = useState<number>(0);
 
-  // Extract color swatches if variants have colors
-  const colorVariants = useMemo(() => {
-    if (!product.variants || product.variants.length <= 1) return [];
-    const colors: { name: string; hex: string; image?: string; variant: ProductVariantItem }[] = [];
-    const seen = new Set<string>();
-
-    product.variants.forEach((v) => {
-      const colorVal = v.attributes?.['Color'] || v.attributes?.['Màu'] || v.attributes?.['màu'] || v.attributes?.['color'];
-      if (colorVal && !seen.has(colorVal.toLowerCase().trim())) {
-        seen.add(colorVal.toLowerCase().trim());
-        colors.push({
-          name: colorVal,
-          hex: resolveColorHex(colorVal),
-          image: v.attributes?.['ImageUrl'] || v.attributes?.['imageUrl'] || undefined,
-          variant: v,
-        });
-      }
-    });
-    return colors;
-  }, [product.variants]);
-
-  const activeImage = useMemo(() => {
-    if (colorVariants.length > 0 && colorVariants[selectedVariantIndex]?.image) {
-      return colorVariants[selectedVariantIndex].image;
-    }
-    return product.image || (product.images && product.images[0]) || '/images/paddle.png';
-  }, [colorVariants, selectedVariantIndex, product.image, product.images]);
+  const activeImage = product.image || (product.images && product.images[0]) || '/images/paddle.png';
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -179,40 +101,6 @@ const BestSellerCard: React.FC<{ product: Product }> = ({ product }) => {
             }}
           />
         </Link>
-
-        {/* Color Swatches (Selkirk Style) */}
-        {colorVariants.length > 1 && (
-          <div className="flex items-center gap-1.5 px-1 py-0.5">
-            {colorVariants.map((c, idx) => {
-              const isSelected = selectedVariantIndex === idx;
-              const isWhiteOrLight = c.hex.toLowerCase() === '#ffffff' || c.hex === '#fff';
-              return (
-                <button
-                  key={c.name}
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSelectedVariantIndex(idx);
-                  }}
-                  onMouseEnter={() => setSelectedVariantIndex(idx)}
-                  className={`w-4 h-4 rounded-xs transition-all duration-150 p-0.5 flex items-center justify-center cursor-pointer ${
-                    isSelected
-                      ? 'ring-2 ring-slate-900 dark:ring-white scale-110'
-                      : 'opacity-70 hover:opacity-100 hover:scale-105 border border-slate-300 dark:border-slate-700'
-                  }`}
-                  title={c.name}
-                  aria-label={c.name}
-                >
-                  <span
-                    className={`w-full h-full rounded-[1px] block ${isWhiteOrLight ? 'border border-slate-300' : ''}`}
-                    style={{ backgroundColor: c.hex }}
-                  />
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {/* Product Details */}
         <div className="space-y-1.5 px-1 flex flex-col flex-1 justify-between">

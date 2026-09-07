@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Search, ShoppingCart, Heart, Bell, User, LogOut, ShieldAlert,
-  ChevronDown, Menu, X, ArrowRight, Sparkles, SlidersHorizontal
+  ChevronDown, Menu, X, ArrowRight, Sparkles, SlidersHorizontal, Download
 } from 'lucide-react';
 
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
+import { usePWAStore } from '@/store/usePWAStore';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 
@@ -29,6 +30,7 @@ export function Header() {
   const { items: wishlistItems } = useWishlistStore();
   const { user, token, logout, isAuthModalOpen, setAuthModalOpen } = useAuthStore();
   const { notifications, unreadCount, markAllRead, fetchNotifications } = useNotificationStore();
+  const { isInstallable, isInstalled, promptInstall } = usePWAStore();
 
   useEffect(() => {
     setMounted(true);
@@ -212,6 +214,20 @@ export function Header() {
                   </div>
                 )}
               </div>
+
+              {/* PWA Install Button (Only visible when browser confirms installable and app not installed) */}
+              {mounted && isInstallable && !isInstalled && (
+                <button
+                  type="button"
+                  onClick={promptInstall}
+                  className="relative p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-xl transition-all border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center active:scale-95 shadow-xs"
+                  title="Cài đặt ứng dụng PickleHub"
+                  aria-label="Cài đặt ứng dụng PickleHub"
+                >
+                  <Download className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                </button>
+              )}
 
               {/* Cart Drawer Trigger */}
               <button
