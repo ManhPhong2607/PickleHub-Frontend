@@ -130,7 +130,7 @@ export const LowStockAlertModal: React.FC<LowStockAlertModalProps> = ({
 
     setSavingThresholdId(targetVariantId);
     try {
-      const qtyToSend = (item.quantity !== undefined && item.quantity > 0) ? item.quantity : 15;
+      const qtyToSend = (item.quantity !== undefined && item.quantity > 0) ? item.quantity : 0;
       await adminApi.updateInventoryThreshold(targetVariantId, currentVal, item.productId, item.sku, qtyToSend);
       setCustomThresholds((prev) => ({ ...prev, [targetVariantId]: currentVal }));
       showToast(`Đã lưu ngưỡng cảnh báo (${currentVal}) cho "${item.productName}"`);

@@ -414,7 +414,7 @@ export const catalogApi = {
       if (product.stock === 0 && product.variants && product.variants.length > 0) {
         product.variants.forEach((v) => {
           if ((v as any).stock === undefined) {
-            (v as any).stock = 15;
+            (v as any).stock = 0;
           }
         });
         product.stock = product.variants.reduce((sum, v) => sum + ((v as any).stock || 0), 0);

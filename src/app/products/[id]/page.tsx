@@ -126,7 +126,7 @@ export default function ProductDetailPage() {
 
   const currentStock = (selectedVariant as any)?.stock !== undefined
     ? Number((selectedVariant as any).stock)
-    : (product.stock > 0 ? product.stock : 15);
+    : (product.stock > 0 ? product.stock : 0);
 
   return (
     <div className="py-12 bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors">

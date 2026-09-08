@@ -143,7 +143,27 @@ export default function AdminPostsPage() {
       cursorPositionRef.current = { start: postDetail.content.length, end: postDetail.content.length };
       setIsModalOpen(true);
     } catch (err) {
-      alert('Không thể tải thông tin bài viết để chỉnh sửa.');
+      console.error('[AdminPosts] Không thể tải chi tiết bài viết để chỉnh sửa:', err);
+      const found = posts.find((p) => p.id === id);
+      if (found) {
+        setEditingPostId(id);
+        const cat = categories.find((c) => c.name === found.categoryName);
+        setFormData({
+          title: found.title,
+          categoryId: cat?.id || categories[0]?.id || '',
+          summary: found.summary || '',
+          content: '',
+          seoTitle: '',
+          seoDescription: '',
+          relatedProductIds: [],
+        });
+        setCoverPreview(found.coverImageUrl || '');
+        setCoverFile(null);
+        setProductSearch('');
+        setIsModalOpen(true);
+      } else {
+        alert('Không thể tải thông tin bài viết để chỉnh sửa.');
+      }
     }
   };
 
@@ -154,7 +174,27 @@ export default function AdminPostsPage() {
       setPreviewPost(postDetail);
       setIsPreviewOpen(true);
     } catch (err) {
-      alert('Không thể tải dữ liệu bài viết để xem trước.');
+      console.error('[AdminPosts] Không thể tải dữ liệu bài viết để xem trước:', err);
+      const found = posts.find((p) => p.id === id);
+      if (found) {
+        setPreviewPost({
+          id: found.id,
+          title: found.title,
+          slug: found.slug,
+          summary: found.summary || '',
+          content: '(Đang tải hoặc nội dung bài viết chưa sẵn sàng)',
+          coverImageUrl: found.coverImageUrl,
+          categoryId: '',
+          categoryName: found.categoryName,
+          status: found.status || 'Draft',
+          publishedAt: found.publishedAt,
+          authorId: '',
+          viewCount: found.viewCount || 0,
+        });
+        setIsPreviewOpen(true);
+      } else {
+        alert('Không thể tải dữ liệu bài viết để xem trước.');
+      }
     } finally {
       setLoadingPreview(false);
     }
@@ -201,12 +241,12 @@ export default function AdminPostsPage() {
   };
 
   const handleArchive = async (id: string) => {
-    if (!confirm('Bạn có chắc muốn lưu trữ bài viết này?')) return;
+    if (!confirm('Bạn có chắc muốn ẩn bài viết này?')) return;
     try {
       await blogApi.archivePost(id);
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Lỗi khi lưu trữ bài viết.');
+      alert(err.response?.data?.message || 'Lỗi khi ẩn bài viết.');
     }
   };
 
@@ -512,8 +552,8 @@ export default function AdminPostsPage() {
             >
               <option value="">Tất cả trạng thái</option>
               <option value="Draft">Bản nháp (Draft)</option>
-              <option value="Published">Đã xuất bản (Published)</option>
-              <option value="Archived">Đã lưu trữ (Archived)</option>
+              <option value="Published">Công khai (Public)</option>
+              <option value="Archived">Riêng tư (Private)</option>
             </select>
           </div>
 
@@ -580,7 +620,7 @@ export default function AdminPostsPage() {
                               ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
                               : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
                           }`}>
-                            {post.status === 'Published' ? 'Đã xuất bản' : post.status === 'Archived' ? 'Đã lưu trữ' : 'Bản nháp'}
+                            {post.status === 'Published' ? 'Công khai' : post.status === 'Archived' ? 'Riêng tư' : 'Bản nháp'}
                           </span>
                         </td>
 
@@ -614,7 +654,7 @@ export default function AdminPostsPage() {
                             <button
                               onClick={() => handleArchive(post.id)}
                               className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-600 dark:text-amber-400"
-                              title="Lưu trữ (Archive)"
+                              title="Ẩn bài viết (Private)"
                             >
                               <Archive className="w-3.5 h-3.5" />
                             </button>
@@ -1052,7 +1092,7 @@ export default function AdminPostsPage() {
                     ? 'bg-emerald-500/10 text-emerald-600'
                     : 'bg-amber-500/10 text-amber-600'
                 }`}>
-                  {previewPost.status === 'Published' ? 'Đã xuất bản' : previewPost.status === 'Archived' ? 'Đã lưu trữ' : 'Bản nháp'}
+                  {previewPost.status === 'Published' ? 'Công khai' : previewPost.status === 'Archived' ? 'Riêng tư' : 'Bản nháp'}
                 </span>
                 <span className="text-xs text-slate-400 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />

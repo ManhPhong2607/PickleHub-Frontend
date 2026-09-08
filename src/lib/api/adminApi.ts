@@ -610,7 +610,7 @@ export const adminApi = {
             handledVariantIds.add(v.id);
             handledVariantIds.add(v.sku);
             const matchingInv = invMap.get(v.id) || invMap.get(v.sku);
-            const qty = matchingInv?.quantity ?? matchingInv?.stock ?? 15;
+            const qty = matchingInv?.quantity ?? matchingInv?.stock ?? 0;
             const threshold = matchingInv?.lowStockThreshold ?? matchingInv?.threshold ?? 5;
 
             const catName = typeof product.category === 'object' && product.category
@@ -638,7 +638,7 @@ export const adminApi = {
         } else {
           // If product has no sub-variants, display base product as default variant
           const matchingInv = invMap.get(product.id) || invMap.get(product.sku);
-          const qty = matchingInv?.quantity ?? matchingInv?.stock ?? 20;
+          const qty = matchingInv?.quantity ?? matchingInv?.stock ?? 0;
           const threshold = matchingInv?.lowStockThreshold ?? 5;
           const catName = typeof product.category === 'object' && product.category
             ? (product.category.name || 'Vợt Pickleball')
