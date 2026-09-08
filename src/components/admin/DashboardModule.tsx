@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -24,6 +24,7 @@ import { ProductConversionSection } from './charts/ProductConversionSection';
 import { LowStockAlertModal } from './LowStockAlertModal';
 import { DatePeriodFilter, DatePeriodValue, computePeriod } from './common/DatePeriodFilter';
 import { AnimatedNumber } from './common/AnimatedNumber';
+import { useResizableColumns, ResizeHandle } from '@/hooks/useResizableColumns';
 import gsap from 'gsap';
 
 export const DashboardModule: React.FC = () => {
@@ -33,6 +34,34 @@ export const DashboardModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'analytics' | 'orders_conversion'>('analytics');
 
   const days = period.days;
+
+  // ── Resizable Columns for Recent Orders Table ──
+  const {
+    widths: orderWidths,
+    totalWidth: orderTotalWidth,
+    activeResizingKey: orderActiveResizingKey,
+    startResize: startOrderResize,
+  } = useResizableColumns({
+    storageKey: 'pickle_col_widths_dash_orders_v2',
+    defaultWidths: {
+      orderNumber: 150,
+      customer: 200,
+      createdAt: 160,
+      firstItem: 260,
+      totalAmount: 140,
+      status: 140,
+      actions: 90,
+    },
+    minWidths: {
+      orderNumber: 110,
+      customer: 140,
+      createdAt: 120,
+      firstItem: 160,
+      totalAmount: 110,
+      status: 110,
+      actions: 80,
+    },
+  });
 
   // ── DATA STATES ────────────────────────────────────────────────────────
   const [orderStats, setOrderStats] = useState<OrderDashboardSummaryDto>({
@@ -355,23 +384,23 @@ export const DashboardModule: React.FC = () => {
       {/* 4 STAT CARDS                                                      */}
       {/* ───────────────────────────────────────────────────────────────── */}
             {/* 4 METRIC CARDS WITH REFINED VISUAL HIERARCHY & DATA-DRIVEN ANIMATIONS */}
-      <div ref={cardsContainerRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div ref={cardsContainerRef} className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
         
         {/* Metric 1: Revenue (Hero Metric) */}
-        <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-50/25 via-white to-white dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 shadow-sm space-y-3 relative overflow-hidden group">
-          <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5" title={`Doanh thu (${period.label})`}>
-              <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              Doanh thu ({period.label})
+        <div className="p-3 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-50/25 via-white to-white dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 shadow-sm space-y-2 sm:space-y-3 relative overflow-hidden group">
+          <div className="flex justify-between items-center text-slate-500 gap-1">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1 sm:gap-1.5 truncate" title={`Doanh thu (${period.label})`}>
+              <DollarSign className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="truncate">Doanh thu ({period.label})</span>
             </span>
-            <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 shrink-0">
               TRỌNG TÂM
             </span>
           </div>
           {statsLoading || analyticsLoading ? (
-            <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+            <div className="h-7 sm:h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
-            <div className="font-display font-black text-3xl sm:text-[32px] text-slate-900 dark:text-white tracking-tight">
+            <div className="font-display font-black text-lg xs:text-xl sm:text-3xl sm:text-[32px] text-slate-900 dark:text-white tracking-tight truncate">
               <AnimatedNumber
                 value={displayRevenue}
                 formatter={(val) =>
@@ -382,136 +411,137 @@ export const DashboardModule: React.FC = () => {
               />
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
-            <div className="flex items-center gap-1">
-              <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold ${
+          <div className="flex flex-col xs:flex-row sm:flex-row items-start sm:items-center justify-between gap-0.5 sm:gap-1 text-[10px] sm:text-xs font-bold pt-1.5 sm:pt-2 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-0.5 sm:gap-1">
+              <span className={`inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-extrabold ${
                 revenueGrowth >= 0 
                   ? 'text-emerald-600 dark:text-emerald-400' 
                   : 'text-rose-600 dark:text-rose-400'
               }`}>
-                {revenueGrowth >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                {revenueGrowth >= 0 ? <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <TrendingDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 {revenueGrowth >= 0 ? `+${revenueGrowth}%` : `${revenueGrowth}%`}
               </span>
-              <span className="text-slate-400 text-[11px] font-medium">so với kỳ trước</span>
+              <span className="text-slate-400 text-[10px] sm:text-[11px] font-medium hidden xs:inline sm:inline">so với kỳ</span>
             </div>
-            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium">
+            <span className="text-slate-500 dark:text-slate-400 text-[10px] sm:text-[11px] font-medium truncate">
               Tháng này: {orderStats.totalOrdersThisMonth} đơn
             </span>
           </div>
         </div>
 
         {/* Metric 2: Orders */}
-        <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
-          <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5" title={`Đơn hàng (${period.label})`}>
-              <ShoppingBag className="w-3.5 h-3.5 text-slate-400" />
-              Đơn hàng ({period.label})
+        <div className="p-3 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2 sm:space-y-3">
+          <div className="flex justify-between items-center text-slate-500 gap-1">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1 sm:gap-1.5 truncate" title={`Đơn hàng (${period.label})`}>
+              <ShoppingBag className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+              <span className="truncate">Đơn hàng ({period.label})</span>
             </span>
           </div>
           {statsLoading || analyticsLoading ? (
-            <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+            <div className="h-7 sm:h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
-            <div className="font-display font-black text-3xl text-slate-900 dark:text-white">
+            <div className="font-display font-black text-lg xs:text-xl sm:text-3xl text-slate-900 dark:text-white truncate">
               <AnimatedNumber
                 value={displayOrders}
                 formatter={(val) => Math.round(val).toLocaleString('vi-VN')}
               />
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
-            <div className="flex items-center gap-1">
-              <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold ${
+          <div className="flex flex-col xs:flex-row sm:flex-row items-start sm:items-center justify-between gap-0.5 sm:gap-1 text-[10px] sm:text-xs font-bold pt-1.5 sm:pt-2 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-0.5 sm:gap-1">
+              <span className={`inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-extrabold ${
                 ordersGrowth >= 0 
                   ? 'text-emerald-600 dark:text-emerald-400' 
                   : 'text-rose-600 dark:text-rose-400'
               }`}>
-                {ordersGrowth >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                {ordersGrowth >= 0 ? <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <TrendingDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 {ordersGrowth >= 0 ? `+${ordersGrowth}%` : `${ordersGrowth}%`}
               </span>
-              <span className="text-slate-400 text-[11px] font-medium">so với kỳ trước</span>
+              <span className="text-slate-400 text-[10px] sm:text-[11px] font-medium hidden xs:inline sm:inline">so với kỳ</span>
             </div>
-            <span className="text-amber-600 dark:text-amber-400 text-[11px] font-medium">
+            <span className="text-amber-600 dark:text-amber-400 text-[10px] sm:text-[11px] font-medium truncate">
               Chờ duyệt: {orderStats.pendingOrders}
             </span>
           </div>
         </div>
 
         {/* Metric 3: Customers */}
-        <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
-          <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-slate-400" />
-              Tổng khách hàng
+        <div className="p-3 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2 sm:space-y-3">
+          <div className="flex justify-between items-center text-slate-500 gap-1">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1 sm:gap-1.5 truncate">
+              <Users className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+              <span className="truncate">Tổng khách hàng</span>
             </span>
           </div>
           {statsLoading ? (
-            <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+            <div className="h-7 sm:h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
-            <div className="font-display font-black text-3xl text-slate-900 dark:text-white">
+            <div className="font-display font-black text-lg xs:text-xl sm:text-3xl text-slate-900 dark:text-white truncate">
               <AnimatedNumber
                 value={customerStats.totalCustomers}
                 formatter={(val) => Math.round(val).toLocaleString('vi-VN')}
               />
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
-            <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-[11px] font-medium">
-              <span>Mới tuần này: <strong className="text-emerald-600 dark:text-emerald-400">{customerStats.newThisMonth}</strong></span>
+          <div className="flex flex-col xs:flex-row sm:flex-row items-start sm:items-center justify-between gap-0.5 sm:gap-1 text-[10px] sm:text-xs font-bold pt-1.5 sm:pt-2 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-[10px] sm:text-[11px] font-medium truncate">
+              <span>Mới: <strong className="text-emerald-600 dark:text-emerald-400">{customerStats.newThisMonth}</strong></span>
             </div>
-            <span className="text-slate-400 text-[11px] font-medium">Khóa: {customerStats.blockedCount}</span>
+            <span className="text-slate-400 text-[10px] sm:text-[11px] font-medium truncate">Khóa: {customerStats.blockedCount}</span>
           </div>
         </div>
 
         {/* Metric 4: Low Stock & Out of Stock Alert (Actionable Alert Card) */}
         <div
           onClick={() => setIsLowStockModalOpen(true)}
-          className={`p-6 bg-white dark:bg-slate-900 rounded-3xl border shadow-sm space-y-3 cursor-pointer transition-all group relative ${
+          className={`p-3 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border shadow-sm space-y-2 sm:space-y-3 cursor-pointer transition-all group relative ${
             lowStockItems.length > 0
               ? 'border-rose-300 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 hover:shadow-md'
               : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
           }`}
           title="Nhấp vào để xem chi tiết các sản phẩm cảnh báo và điều chỉnh ngưỡng"
         >
-          <div className="flex justify-between items-center text-slate-500">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors flex items-center gap-1">
-              Cảnh báo tồn kho
-              <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex justify-between items-center text-slate-500 gap-1">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors flex items-center gap-0.5 sm:gap-1 truncate">
+              <span className="truncate">Cảnh báo tồn kho</span>
+              <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
             </span>
             {lowStockItems.length > 0 ? (
-              <span className="flex items-center gap-1 text-[11px] font-extrabold text-rose-600 dark:text-rose-400">
-                <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
-                Cần chú ý
+              <span className="flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[11px] font-extrabold text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
+                <span className="hidden xs:inline sm:inline">Cần chú ý</span>
+                <span className="xs:hidden sm:hidden">Chú ý</span>
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                An toàn
+                <span>An toàn</span>
               </span>
             )}
           </div>
           {inventoryLoading ? (
-            <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+            <div className="h-7 sm:h-9 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
           ) : (
-            <div className={`font-display font-black text-3xl ${
+            <div className={`font-display font-black text-lg xs:text-xl sm:text-3xl truncate ${
               lowStockItems.length > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'
             }`}>
               <AnimatedNumber
                 value={lowStockItems.length}
                 formatter={(val) => `${Math.round(val)}`}
-              /> <span className="text-xs font-bold text-slate-400 font-sans">sản phẩm</span>
+              /> <span className="text-[10px] sm:text-xs font-bold text-slate-400 font-sans">sản phẩm</span>
             </div>
           )}
-          <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="flex flex-col xs:flex-row sm:flex-row items-start sm:items-center justify-between gap-0.5 sm:gap-1 text-[10px] sm:text-xs font-bold pt-1.5 sm:pt-2 border-t border-slate-100 dark:border-slate-800/80">
             {outOfStockCount > 0 ? (
-              <span className="text-rose-600 dark:text-rose-400 text-[11px] font-black flex items-center gap-1">
-                🔴 {outOfStockCount} hết hàng
+              <span className="text-rose-600 dark:text-rose-400 text-[10px] sm:text-[11px] font-black flex items-center gap-0.5 sm:gap-1 truncate">
+                🔴 {outOfStockCount} hết
               </span>
             ) : (
-              <span className="text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
-                ✅ 0 hết hàng
+              <span className="text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-[11px] font-bold truncate">
+                ✅ 0 hết
               </span>
             )}
-            <span className="text-amber-600 dark:text-amber-400 text-[11px] font-bold">
+            <span className="text-amber-600 dark:text-amber-400 text-[10px] sm:text-[11px] font-bold truncate">
               🟡 {nearOutOfStockCount} sắp hết
             </span>
           </div>
@@ -681,17 +711,41 @@ export const DashboardModule: React.FC = () => {
               : 'Chưa có đơn hàng nào phát sinh gần đây'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="text-[11px] font-extrabold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-2">
+          <div className="overflow-x-auto w-full scrollbar-thin">
+            <table
+              style={{ width: `${orderTotalWidth}px`, minWidth: '100%' }}
+              className="text-xs text-left table-fixed border-collapse"
+            >
+              <thead className="text-[11px] font-extrabold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
                 <tr>
-                  <th className="py-2.5 px-3">Mã đơn hàng</th>
-                  <th className="py-2.5 px-3">Khách hàng</th>
-                  <th className="py-2.5 px-3">Thời gian đặt</th>
-                  <th className="py-2.5 px-3">Sản phẩm tiêu biểu</th>
-                  <th className="py-2.5 px-3">Tổng tiền</th>
-                  <th className="py-2.5 px-3">Trạng thái</th>
-                  <th className="py-2.5 px-3 text-right">Chi tiết</th>
+                  <th style={{ width: orderWidths.orderNumber }} className="relative py-2.5 px-3 select-none border-r border-slate-100 dark:border-slate-800">
+                    Mã đơn hàng
+                    <ResizeHandle onMouseDown={(e) => startOrderResize('orderNumber', e)} isResizing={orderActiveResizingKey === 'orderNumber'} />
+                  </th>
+                  <th style={{ width: orderWidths.customer }} className="relative py-2.5 px-3 select-none border-r border-slate-100 dark:border-slate-800">
+                    Khách hàng
+                    <ResizeHandle onMouseDown={(e) => startOrderResize('customer', e)} isResizing={orderActiveResizingKey === 'customer'} />
+                  </th>
+                  <th style={{ width: orderWidths.createdAt }} className="relative py-2.5 px-3 select-none border-r border-slate-100 dark:border-slate-800">
+                    Thời gian đặt
+                    <ResizeHandle onMouseDown={(e) => startOrderResize('createdAt', e)} isResizing={orderActiveResizingKey === 'createdAt'} />
+                  </th>
+                  <th style={{ width: orderWidths.firstItem }} className="relative py-2.5 px-3 select-none border-r border-slate-100 dark:border-slate-800">
+                    Sản phẩm tiêu biểu
+                    <ResizeHandle onMouseDown={(e) => startOrderResize('firstItem', e)} isResizing={orderActiveResizingKey === 'firstItem'} />
+                  </th>
+                  <th style={{ width: orderWidths.totalAmount }} className="relative py-2.5 px-3 select-none border-r border-slate-100 dark:border-slate-800">
+                    Tổng tiền
+                    <ResizeHandle onMouseDown={(e) => startOrderResize('totalAmount', e)} isResizing={orderActiveResizingKey === 'totalAmount'} />
+                  </th>
+                  <th style={{ width: orderWidths.status }} className="relative py-2.5 px-3 select-none border-r border-slate-100 dark:border-slate-800">
+                    Trạng thái
+                    <ResizeHandle onMouseDown={(e) => startOrderResize('status', e)} isResizing={orderActiveResizingKey === 'status'} />
+                  </th>
+                  <th style={{ width: orderWidths.actions }} className="relative py-2.5 px-3 text-right select-none">
+                    Chi tiết
+                    <ResizeHandle onMouseDown={(e) => startOrderResize('actions', e)} isResizing={orderActiveResizingKey === 'actions'} />
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold text-slate-700 dark:text-slate-300">
@@ -709,36 +763,36 @@ export const DashboardModule: React.FC = () => {
 
                   return (
                     <tr key={ord.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="py-3.5 px-3 font-mono font-black text-slate-900 dark:text-white">
+                      <td className="py-3.5 px-3 font-mono font-black text-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800 truncate">
                         {ord.orderNumber}
                       </td>
-                      <td className="py-3.5 px-3">
-                        <div className="flex items-center gap-2">
+                      <td className="py-3.5 px-3 border-r border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-2 min-w-0">
                           <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-black flex items-center justify-center text-xs shrink-0">
                             {avatarChar}
                           </div>
-                          <div>
-                            <span className="font-bold block text-slate-900 dark:text-white">{ord.customerName}</span>
-                            <span className="text-[10px] text-slate-400 block">{ord.customerPhone}</span>
+                          <div className="truncate">
+                            <span className="font-bold block text-slate-900 dark:text-white truncate">{ord.customerName}</span>
+                            <span className="text-[10px] text-slate-400 block truncate">{ord.customerPhone}</span>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3.5 px-3 text-slate-500 dark:text-slate-400 font-medium">
+                      <td className="py-3.5 px-3 text-slate-500 dark:text-slate-400 font-medium border-r border-slate-100 dark:border-slate-800 truncate">
                         {formattedDate}
                       </td>
-                      <td className="py-3.5 px-3 max-w-[200px]">
+                      <td className="py-3.5 px-3 border-r border-slate-100 dark:border-slate-800">
                         <span className="truncate block font-medium text-slate-800 dark:text-slate-200" title={ord.firstItemName}>
                           {ord.firstItemName || 'Sản phẩm Pickleball'}
                           {ord.itemCount > 1 && <span className="text-[10px] text-slate-400 ml-1">+{ord.itemCount - 1} món</span>}
                         </span>
                       </td>
-                      <td className="py-3.5 px-3 font-display font-black text-slate-900 dark:text-white">
+                      <td className="py-3.5 px-3 font-display font-black text-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         {ord.totalAmount.toLocaleString('vi-VN')} ₫
                       </td>
-                      <td className="py-3.5 px-3">
+                      <td className="py-3.5 px-3 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         {renderOrderStatusBadge(ord.status)}
                       </td>
-                      <td className="py-3.5 px-3 text-right">
+                      <td className="py-3.5 px-3 text-right whitespace-nowrap">
                         <Link
                           href={`/admin/orders`}
                           className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white font-bold text-xs transition-all inline-block"

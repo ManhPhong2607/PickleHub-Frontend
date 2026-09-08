@@ -67,7 +67,7 @@ export const CustomersModule: React.FC = () => {
       spent: 150,
       date: 130,
       status: 130,
-      actions: 140,
+      actions: 170,
     },
     minWidths: {
       name: 150,
@@ -77,7 +77,7 @@ export const CustomersModule: React.FC = () => {
       spent: 110,
       date: 100,
       status: 100,
-      actions: 110,
+      actions: 140,
     },
   });
 
@@ -220,31 +220,31 @@ export const CustomersModule: React.FC = () => {
           >
             <thead className="bg-slate-50/70 dark:bg-slate-800/50 text-[11px] font-extrabold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
-                <th style={{ width: widths.name }} className="relative py-4 px-5 select-none">
+                <th style={{ width: widths.name }} className="relative py-4 px-5 select-none border-r border-slate-100 dark:border-slate-800">
                   Họ và tên
                   <ResizeHandle onMouseDown={(e) => startResize('name', e)} isResizing={activeResizingKey === 'name'} />
                 </th>
-                <th style={{ width: widths.email }} className="relative py-4 px-5 select-none">
+                <th style={{ width: widths.email }} className="relative py-4 px-5 select-none border-r border-slate-100 dark:border-slate-800">
                   Email
                   <ResizeHandle onMouseDown={(e) => startResize('email', e)} isResizing={activeResizingKey === 'email'} />
                 </th>
-                <th style={{ width: widths.phone }} className="relative py-4 px-5 select-none">
+                <th style={{ width: widths.phone }} className="relative py-4 px-5 select-none border-r border-slate-100 dark:border-slate-800">
                   SĐT
                   <ResizeHandle onMouseDown={(e) => startResize('phone', e)} isResizing={activeResizingKey === 'phone'} />
                 </th>
-                <th style={{ width: widths.tier }} className="relative py-4 px-5 select-none">
+                <th style={{ width: widths.tier }} className="relative py-4 px-5 select-none border-r border-slate-100 dark:border-slate-800">
                   Cấp bậc Loyalty
                   <ResizeHandle onMouseDown={(e) => startResize('tier', e)} isResizing={activeResizingKey === 'tier'} />
                 </th>
-                <th style={{ width: widths.spent }} className="relative py-4 px-5 select-none">
+                <th style={{ width: widths.spent }} className="relative py-4 px-5 select-none border-r border-slate-100 dark:border-slate-800">
                   Tổng chi tiêu
                   <ResizeHandle onMouseDown={(e) => startResize('spent', e)} isResizing={activeResizingKey === 'spent'} />
                 </th>
-                <th style={{ width: widths.date }} className="relative py-4 px-5 select-none">
+                <th style={{ width: widths.date }} className="relative py-4 px-5 select-none border-r border-slate-100 dark:border-slate-800">
                   Ngày tham gia
                   <ResizeHandle onMouseDown={(e) => startResize('date', e)} isResizing={activeResizingKey === 'date'} />
                 </th>
-                <th style={{ width: widths.status }} className="relative py-4 px-5 select-none">
+                <th style={{ width: widths.status }} className="relative py-4 px-5 select-none border-r border-slate-100 dark:border-slate-800">
                   Trạng thái
                   <ResizeHandle onMouseDown={(e) => startResize('status', e)} isResizing={activeResizingKey === 'status'} />
                 </th>
@@ -270,33 +270,33 @@ export const CustomersModule: React.FC = () => {
                 </tr>
               ) : customers.map(cust => (
                 <tr key={cust.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                  <td className="py-4 px-5">
-                    <div className="flex items-center gap-2.5">
+                  <td className="py-4 px-5 border-r border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0">
                         {cust.fullName.charAt(0)}
                       </div>
                       <span className="font-bold text-slate-900 dark:text-white truncate">{cust.fullName}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-5 text-slate-700 dark:text-slate-300 truncate">{cust.email}</td>
-                  <td className="py-4 px-5 font-mono text-slate-500">{cust.phone || cust.phoneNumber || '—'}</td>
-                  <td className="py-4 px-5">
+                  <td className="py-4 px-5 text-slate-700 dark:text-slate-300 truncate border-r border-slate-100 dark:border-slate-800">{cust.email}</td>
+                  <td className="py-4 px-5 font-mono text-slate-500 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">{cust.phone || cust.phoneNumber || '—'}</td>
+                  <td className="py-4 px-5 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                     {renderTierBadge(cust.loyaltyTierName || cust.currentTierName, cust.loyaltyDiscountPercent || cust.currentDiscountPercent)}
                   </td>
-                  <td className="py-4 px-5 font-bold text-slate-900 dark:text-slate-200">
+                  <td className="py-4 px-5 font-bold text-slate-900 dark:text-slate-200 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                     {(cust.totalSpent ?? 0).toLocaleString('vi-VN')}₫
                   </td>
-                  <td className="py-4 px-5 text-slate-500">
+                  <td className="py-4 px-5 text-slate-500 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                     {cust.createdAt ? new Date(cust.createdAt).toLocaleDateString('vi-VN') : '—'}
                   </td>
-                  <td className="py-4 px-5">
+                  <td className="py-4 px-5 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                       cust.isBlocked ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-400' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
                     }`}>
                       {cust.isBlocked ? 'Đã bị khóa' : 'Đang hoạt động'}
                     </span>
                   </td>
-                  <td className="py-4 px-5 text-right space-x-2">
+                  <td className="py-4 px-5 text-right space-x-2 whitespace-nowrap">
                     <button onClick={() => handleOpenDetail(cust)}
                       className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all inline-flex items-center gap-1">
                       <Eye className="w-3.5 h-3.5" />

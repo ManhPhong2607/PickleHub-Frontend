@@ -223,9 +223,11 @@ export const ProductsModule: React.FC = () => {
       setError(null);
       const data = await adminApi.getProducts();
       setAllProducts(data);
+      return data;
     } catch (err: any) {
       console.error('Fetch products error:', err);
       setError(err?.response?.data?.message || err?.message || 'Lỗi khi tải danh sách sản phẩm');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -451,14 +453,34 @@ export const ProductsModule: React.FC = () => {
     setEditingProduct(product);
     setProductEditTab('general');
     setTimePivotDate('');
+
+    // Safely match categoryId
+    const matchedCategory = dbCategories.find(
+      (c) => c.id === product.categoryId || (product.category && c.name?.toLowerCase() === product.category?.toLowerCase())
+    );
+    const categoryId = product.categoryId || matchedCategory?.id || dbCategories[0]?.id || '';
+
+    // Safely match brandId
+    const matchedBrand = dbBrands.find(
+      (b) => b.id === product.brandId || (product.brand && b.name?.toLowerCase() === product.brand?.toLowerCase())
+    );
+    const brandId = product.brandId || matchedBrand?.id || dbBrands[0]?.id || '';
+
+    // Normalize status to 'active' | 'draft' | 'hidden'
+    const rawStatus = (product.status || '').toLowerCase();
+    const normalizedStatus: ProductStatus =
+      (rawStatus === 'draft' || rawStatus === '0') ? 'draft'
+      : (rawStatus === 'hidden' || rawStatus === '2' || rawStatus === 'archived') ? 'hidden'
+      : 'active';
+
     setProductForm({
       name: product.name,
       description: product.description || '',
-      categoryId: product.categoryId || dbCategories.find((c) => c.name === product.category)?.id || '',
-      brandId: product.brandId || dbBrands.find((b) => b.name === product.brand)?.id || '',
+      categoryId,
+      brandId,
       price: product.price,
       image: product.image,
-      status: product.status,
+      status: normalizedStatus,
     });
     setProductSelectedFile(null);
     setProductPreviewUrl(product.image);
@@ -475,11 +497,27 @@ export const ProductsModule: React.FC = () => {
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!productForm.name?.trim()) {
+      showToast('Tên sản phẩm không được để trống.', 'error');
+      return;
+    }
+
+    if (!productForm.categoryId) {
+      showToast('Vui lòng chọn danh mục cho sản phẩm.', 'error');
+      return;
+    }
+
+    if (!productForm.brandId) {
+      showToast('Vui lòng chọn thương hiệu cho sản phẩm.', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (editingProduct) {
         await adminApi.updateProduct(editingProduct.id, {
-          name: productForm.name,
+          name: productForm.name.trim(),
           description: productForm.description,
           categoryId: productForm.categoryId,
           brandId: productForm.brandId,
@@ -500,7 +538,7 @@ export const ProductsModule: React.FC = () => {
         showToast('Cập nhật sản phẩm thành công!');
       } else {
         const created = await adminApi.createProduct({
-          name: productForm.name,
+          name: productForm.name.trim(),
           description: productForm.description,
           categoryId: productForm.categoryId,
           brandId: productForm.brandId,
@@ -525,7 +563,17 @@ export const ProductsModule: React.FC = () => {
       setIsProductModalOpen(false);
       await fetchProducts();
     } catch (err: any) {
-      showToast('Lỗi khi lưu sản phẩm: ' + (err?.response?.data?.message || err?.message), 'error');
+      console.error('[SAVE PRODUCT ERROR]', err);
+      const errData = err?.response?.data;
+      let errorMsg = '';
+      if (errData?.errors && typeof errData.errors === 'object') {
+        errorMsg = Object.entries(errData.errors)
+          .map(([field, msgs]: [string, any]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+          .join(' | ');
+      } else {
+        errorMsg = errData?.detail || errData?.message || errData?.title || err?.message || 'Có lỗi xảy ra khi lưu sản phẩm';
+      }
+      showToast('Lỗi khi lưu sản phẩm: ' + errorMsg, 'error');
     } finally {
       setSubmitting(false);
       setUploadingProductImg(false);
@@ -1102,17 +1150,6 @@ export const ProductsModule: React.FC = () => {
         }
       />
 
-      {/* Assign Promotion Modal */}
-      <AssignPromotionModal
-        isOpen={assignPromoModal.isOpen}
-        onClose={() => setAssignPromoModal({ isOpen: false, products: [] })}
-        products={assignPromoModal.products}
-        onSuccess={async () => {
-          showToast('Đã áp dụng khuyến mãi thành công!');
-          await fetchProducts();
-          handleDeselectAll();
-        }}
-      />
 
       {/* Storefront Preview Modal */}
       <StorefrontPreviewModal
@@ -1828,6 +1865,24 @@ export const ProductsModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Assign Promotion Modal - Rendered last so it sits on top of all modals */}
+      <AssignPromotionModal
+        isOpen={assignPromoModal.isOpen}
+        onClose={() => setAssignPromoModal({ isOpen: false, products: [] })}
+        products={assignPromoModal.products}
+        onSuccess={async () => {
+          showToast('Đã áp dụng khuyến mãi thành công!');
+          const freshData = await fetchProducts();
+          handleDeselectAll();
+          if (editingProduct && freshData && freshData.length > 0) {
+            const updated = freshData.find((p) => p.id === editingProduct.id);
+            if (updated) {
+              setEditingProduct(updated);
+            }
+          }
+        }}
+      />
 
     </div>
   );

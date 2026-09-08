@@ -120,6 +120,7 @@ export interface StatusConfig {
 export function getStatusStyle(status: string): StatusConfig {
   switch (status?.toLowerCase()) {
     case 'active':
+    case 'published':
       return {
         label: 'Kích hoạt',
         bg: 'bg-emerald-50 dark:bg-emerald-950/50',
@@ -136,6 +137,7 @@ export function getStatusStyle(status: string): StatusConfig {
         dot: 'bg-slate-400',
       };
     case 'hidden':
+    case 'archived':
       return {
         label: 'Đang ẩn',
         bg: 'bg-amber-50 dark:bg-amber-950/50',

@@ -899,27 +899,27 @@ export const ReviewsModule: React.FC = () => {
           >
             <thead className="bg-slate-50/70 dark:bg-slate-800/50 text-[11px] font-extrabold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
-                <th style={{ width: widths.user }} className="relative py-4 px-4 select-none">
+                <th style={{ width: widths.user }} className="relative py-4 px-4 select-none border-r border-slate-100 dark:border-slate-800">
                   Khách hàng
                   <ResizeHandle onMouseDown={(e) => startResize('user', e)} isResizing={activeResizingKey === 'user'} />
                 </th>
-                <th style={{ width: widths.product }} className="relative py-4 px-4 select-none">
+                <th style={{ width: widths.product }} className="relative py-4 px-4 select-none border-r border-slate-100 dark:border-slate-800">
                   Sản phẩm
                   <ResizeHandle onMouseDown={(e) => startResize('product', e)} isResizing={activeResizingKey === 'product'} />
                 </th>
-                <th style={{ width: widths.rating }} className="relative py-4 px-4 select-none">
+                <th style={{ width: widths.rating }} className="relative py-4 px-4 select-none border-r border-slate-100 dark:border-slate-800">
                   Đánh giá
                   <ResizeHandle onMouseDown={(e) => startResize('rating', e)} isResizing={activeResizingKey === 'rating'} />
                 </th>
-                <th style={{ width: widths.content }} className="relative py-4 px-4 select-none">
+                <th style={{ width: widths.content }} className="relative py-4 px-4 select-none border-r border-slate-100 dark:border-slate-800">
                   Nội dung & Phản hồi
                   <ResizeHandle onMouseDown={(e) => startResize('content', e)} isResizing={activeResizingKey === 'content'} />
                 </th>
-                <th style={{ width: widths.status }} className="relative py-4 px-4 select-none">
+                <th style={{ width: widths.status }} className="relative py-4 px-4 select-none border-r border-slate-100 dark:border-slate-800">
                   Trạng thái
                   <ResizeHandle onMouseDown={(e) => startResize('status', e)} isResizing={activeResizingKey === 'status'} />
                 </th>
-                <th style={{ width: widths.date }} className="relative py-4 px-4 select-none">
+                <th style={{ width: widths.date }} className="relative py-4 px-4 select-none border-r border-slate-100 dark:border-slate-800">
                   Ngày gửi
                   <ResizeHandle onMouseDown={(e) => startResize('date', e)} isResizing={activeResizingKey === 'date'} />
                 </th>
@@ -955,12 +955,12 @@ export const ReviewsModule: React.FC = () => {
                   }`}
                 >
                   {/* Customer */}
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2.5">
+                  <td className="py-4 px-4 border-r border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-black flex items-center justify-center text-xs shrink-0">
                         {(rev.userName || 'K').charAt(0).toUpperCase()}
                       </div>
-                      <div className="truncate">
+                      <div className="truncate min-w-0">
                         <span className="font-bold text-slate-900 dark:text-white block truncate">
                           {rev.userName || 'Khách hàng'}
                         </span>
@@ -972,15 +972,15 @@ export const ReviewsModule: React.FC = () => {
                   </td>
 
                   {/* Product */}
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2.5">
+                  <td className="py-4 px-4 border-r border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={rev.productImage || '/images/paddle.png'}
                         alt={rev.productName || 'Product'}
                         className="w-9 h-9 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
                         onError={(e) => { (e.target as any).src = '/images/paddle.png'; }}
                       />
-                      <div className="truncate">
+                      <div className="truncate min-w-0">
                         <span className="font-bold text-slate-900 dark:text-white block truncate hover:text-emerald-600 transition-colors" title={rev.productName}>
                           {rev.productName || 'Sản phẩm PickleHub'}
                         </span>
@@ -994,7 +994,7 @@ export const ReviewsModule: React.FC = () => {
                   </td>
 
                   {/* Rating */}
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                     <StarRating rating={rev.rating} />
                     <span className="text-[10px] font-bold text-slate-400 block mt-0.5">
                       {rev.rating} trên 5 sao
@@ -1002,7 +1002,7 @@ export const ReviewsModule: React.FC = () => {
                   </td>
 
                   {/* Content & Reply Snapshot */}
-                  <td className="py-4 px-4 max-w-xs">
+                  <td className="py-4 px-4 max-w-xs border-r border-slate-100 dark:border-slate-800">
                     <p className="text-slate-800 dark:text-slate-200 text-xs line-clamp-2" title={rev.comment}>
                       {rev.comment || <em className="text-slate-400">(Không có bình luận chữ)</em>}
                     </p>
@@ -1039,7 +1039,7 @@ export const ReviewsModule: React.FC = () => {
                   </td>
 
                   {/* Status */}
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${
                       rev.isHidden
                         ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-400'
@@ -1060,12 +1060,12 @@ export const ReviewsModule: React.FC = () => {
                   </td>
 
                   {/* Date */}
-                  <td className="py-4 px-4 text-slate-500 font-mono text-[11px]">
+                  <td className="py-4 px-4 text-slate-500 font-mono text-[11px] border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                     {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString('vi-VN') : '—'}
                   </td>
 
                   {/* Actions */}
-                  <td className="py-4 px-4 text-right space-x-1.5">
+                  <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
                     <button
                       onClick={() => setViewingReview(rev)}
                       className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"

@@ -7,6 +7,7 @@ import {
   ExternalLink, ChevronLeft, ChevronRight, Search, X
 } from 'lucide-react';
 import { ProductInsightItemDto } from '@/lib/api/adminApi';
+import { useResizableColumns, ResizeHandle } from '@/hooks/useResizableColumns';
 
 interface ProductConversionItem {
   id: string;
@@ -35,6 +36,28 @@ export const ProductConversionSection: React.FC<ProductConversionSectionProps> =
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  const { widths, totalWidth, activeResizingKey, startResize } = useResizableColumns({
+    storageKey: 'pickle_col_widths_dash_conversion_v2',
+    defaultWidths: {
+      product: 260,
+      sku: 140,
+      views: 120,
+      sales: 120,
+      rate: 160,
+      status: 200,
+      actions: 100,
+    },
+    minWidths: {
+      product: 180,
+      sku: 100,
+      views: 90,
+      sales: 90,
+      rate: 120,
+      status: 150,
+      actions: 80,
+    },
+  });
 
   const needsReviewIdSet = useMemo(() => {
     return new Set(needsReviewList.map(p => p.productId));
@@ -188,32 +211,50 @@ export const ProductConversionSection: React.FC<ProductConversionSectionProps> =
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
-            <table className="w-full text-xs text-left">
+          <div className="overflow-x-auto w-full scrollbar-thin rounded-2xl border border-slate-100 dark:border-slate-800">
+            <table
+              style={{ width: `${totalWidth}px`, minWidth: '100%' }}
+              className="text-xs text-left table-fixed border-collapse"
+            >
               <thead className="bg-slate-50 dark:bg-slate-800/60 text-[11px] font-extrabold uppercase text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">Sản phẩm</th>
-                  <th className="py-3 px-4">Mã SKU</th>
-                  <th className="py-3 px-4 text-center">
+                  <th style={{ width: widths.product }} className="relative py-3 px-4 select-none border-r border-slate-100 dark:border-slate-800">
+                    Sản phẩm
+                    <ResizeHandle onMouseDown={(e) => startResize('product', e)} isResizing={activeResizingKey === 'product'} />
+                  </th>
+                  <th style={{ width: widths.sku }} className="relative py-3 px-4 select-none border-r border-slate-100 dark:border-slate-800">
+                    Mã SKU
+                    <ResizeHandle onMouseDown={(e) => startResize('sku', e)} isResizing={activeResizingKey === 'sku'} />
+                  </th>
+                  <th style={{ width: widths.views }} className="relative py-3 px-4 text-center select-none border-r border-slate-100 dark:border-slate-800">
                     <div className="inline-flex items-center gap-1">
                       <Eye className="w-3.5 h-3.5 text-cyan-500" />
                       <span>Lượt xem</span>
                     </div>
+                    <ResizeHandle onMouseDown={(e) => startResize('views', e)} isResizing={activeResizingKey === 'views'} />
                   </th>
-                  <th className="py-3 px-4 text-center">
+                  <th style={{ width: widths.sales }} className="relative py-3 px-4 text-center select-none border-r border-slate-100 dark:border-slate-800">
                     <div className="inline-flex items-center gap-1">
                       <ShoppingCart className="w-3.5 h-3.5 text-emerald-500" />
                       <span>Lượt bán</span>
                     </div>
+                    <ResizeHandle onMouseDown={(e) => startResize('sales', e)} isResizing={activeResizingKey === 'sales'} />
                   </th>
-                  <th className="py-3 px-4 text-center">
+                  <th style={{ width: widths.rate }} className="relative py-3 px-4 text-center select-none border-r border-slate-100 dark:border-slate-800">
                     <div className="inline-flex items-center gap-1">
                       <Percent className="w-3.5 h-3.5 text-purple-500" />
                       <span>Tỷ lệ chuyển đổi</span>
                     </div>
+                    <ResizeHandle onMouseDown={(e) => startResize('rate', e)} isResizing={activeResizingKey === 'rate'} />
                   </th>
-                  <th className="py-3 px-4">Trạng thái phân tích</th>
-                  <th className="py-3 px-4 text-right">Chi tiết</th>
+                  <th style={{ width: widths.status }} className="relative py-3 px-4 select-none border-r border-slate-100 dark:border-slate-800">
+                    Trạng thái phân tích
+                    <ResizeHandle onMouseDown={(e) => startResize('status', e)} isResizing={activeResizingKey === 'status'} />
+                  </th>
+                  <th style={{ width: widths.actions }} className="relative py-3 px-4 text-right select-none">
+                    Chi tiết
+                    <ResizeHandle onMouseDown={(e) => startResize('actions', e)} isResizing={activeResizingKey === 'actions'} />
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold">
@@ -228,30 +269,30 @@ export const ProductConversionSection: React.FC<ProductConversionSectionProps> =
                           : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                       }`}
                     >
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
+                      <td className="py-3 px-4 border-r border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-3 min-w-0">
                           <img
                             src={p.image || '/images/paddle.png'}
                             alt={p.name}
                             className="w-9 h-9 rounded-xl object-contain bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 shrink-0"
                           />
-                          <span className="font-bold text-slate-900 dark:text-white max-w-[220px] truncate block" title={p.name}>
+                          <span className="font-bold text-slate-900 dark:text-white truncate block" title={p.name}>
                             {p.name}
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-slate-500">{p.sku}</td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-4 font-mono text-slate-500 border-r border-slate-100 dark:border-slate-800 truncate">{p.sku}</td>
+                      <td className="py-3 px-4 text-center border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         <span className="font-display font-black text-slate-800 dark:text-slate-200">
                           {p.viewCount.toLocaleString('vi-VN')}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-4 text-center border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         <span className="font-display font-black text-emerald-600 dark:text-emerald-400">
                           {p.soldCount.toLocaleString('vi-VN')}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-4 text-center border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-black inline-block ${
                           isHighConversion
                             ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400'
@@ -262,7 +303,7 @@ export const ProductConversionSection: React.FC<ProductConversionSectionProps> =
                           {p.conversionRate.toFixed(1)}%
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         {p.isNeedsReview ? (
                           <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-extrabold text-[11px]">
                             <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -277,7 +318,7 @@ export const ProductConversionSection: React.FC<ProductConversionSectionProps> =
                           <span className="text-slate-400 text-[11px] font-medium">Bình thường</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
                         <Link
                           href={`/admin/products`}
                           className="inline-flex items-center gap-1 text-slate-500 hover:text-emerald-600 font-bold text-xs transition-colors"

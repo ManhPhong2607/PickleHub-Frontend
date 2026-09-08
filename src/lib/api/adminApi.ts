@@ -6,6 +6,7 @@ export interface AdminProductDto {
   id: string;
   name: string;
   sku: string;
+  description?: string;
   category: string;
   categoryId?: string;
   brand: string;
@@ -381,7 +382,11 @@ export const adminApi = {
         })),
         stock: p.totalStock ?? p.stock ?? 0,
         image: p.thumbnailUrl || p.image || '/images/paddle.png',
-        status: p.status === 0 || p.status === 'Draft' ? 'Draft' : p.status === 2 || p.status === 'Archived' ? 'Archived' : 'Published',
+        status: (p.status === 0 || p.status === 'Draft' || p.status === 'draft')
+          ? 'draft'
+          : (p.status === 2 || p.status === 'Hidden' || p.status === 'hidden' || p.status === 'Archived' || p.status === 'archived')
+          ? 'hidden'
+          : 'active',
         createdAt: p.createdAt,
         soldCount: Number(p.soldCount ?? 0),
         viewCount: Number(p.viewCount ?? 0),
@@ -448,31 +453,71 @@ export const adminApi = {
   },
 
   async createProduct(data: any): Promise<any> {
-    const res = await apiClient.post('/products', data);
+    const statusMap: Record<string, string> = {
+      active: 'Active',
+      published: 'Active',
+      draft: 'Draft',
+      hidden: 'Hidden',
+      archived: 'Hidden',
+    };
+    const mappedStatus = data.status
+      ? (statusMap[data.status.toString().toLowerCase()] || 'Active')
+      : 'Active';
+
+    const payload: any = {
+      name: data.name,
+      description: data.description || '',
+      categoryId: data.categoryId,
+      brandId: data.brandId,
+      basePrice: data.basePrice ?? data.price,
+      price: data.price ?? data.basePrice,
+      sku: data.sku || undefined,
+      specsJson: data.specsJson || '{}',
+      status: mappedStatus,
+    };
+
+    const res = await apiClient.post('/products', payload);
     return res.data;
   },
 
   async updateProduct(id: string, data: any): Promise<void> {
-    // Map status string if present
     const statusMap: Record<string, string> = {
       active: 'Active',
+      published: 'Active',
       draft: 'Draft',
       hidden: 'Hidden',
+      archived: 'Hidden',
     };
-    const payload = {
-      ...data,
-      status: data.status ? (statusMap[data.status.toLowerCase()] || data.status) : undefined,
+    const mappedStatus = data.status
+      ? (statusMap[data.status.toString().toLowerCase()] || 'Active')
+      : undefined;
+
+    const payload: any = {
+      id,
+      name: data.name,
+      description: data.description || '',
+      categoryId: data.categoryId,
+      brandId: data.brandId,
+      basePrice: data.basePrice ?? data.price,
+      price: data.price ?? data.basePrice,
+      specsJson: data.specsJson || '{}',
     };
+    if (mappedStatus) {
+      payload.status = mappedStatus;
+    }
+
     await apiClient.put(`/products/${id}`, payload);
   },
 
   async bulkUpdateProductStatus(productIds: string[], status: string): Promise<any> {
     const statusMap: Record<string, string> = {
       active: 'Active',
+      published: 'Active',
       draft: 'Draft',
       hidden: 'Hidden',
+      archived: 'Hidden',
     };
-    const mappedStatus = statusMap[status.toLowerCase()] || status;
+    const mappedStatus = statusMap[status.toString().toLowerCase()] || status;
     const res = await apiClient.patch('/admin/products/bulk-status', {
       productIds,
       status: mappedStatus,
