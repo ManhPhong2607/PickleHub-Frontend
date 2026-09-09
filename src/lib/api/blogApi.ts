@@ -30,6 +30,9 @@ export interface RelatedProductDto {
   effectivePrice?: number;
   salePercent?: number;
   imageUrl?: string;
+  image?: string;
+  thumbnailUrl?: string;
+  images?: string[];
   categoryName?: string;
   brandName?: string;
 }

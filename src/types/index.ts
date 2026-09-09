@@ -38,6 +38,8 @@ export interface Product {
   reviewsCount: number;
   image: string;
   images?: string[];
+  imageUrl?: string;
+  thumbnailUrl?: string;
   badge?: string;
   description?: string;
   sku?: string;

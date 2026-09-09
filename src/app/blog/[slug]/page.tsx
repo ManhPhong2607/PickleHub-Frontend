@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -105,10 +105,12 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
       .getPostBySlug(slug)
       .then(async (data) => {
         setPost(data);
-        // Nếu backend chưa trả relatedProducts nhưng có relatedProductIds, fetch bổ sung từ Catalog API
-        if ((!data.relatedProducts || data.relatedProducts.length === 0) && data.relatedProductIds && data.relatedProductIds.length > 0) {
+        // Nếu backend chưa trả relatedProducts hoặc thiếu ảnh, fetch bổ sung từ Catalog API
+        const hasMissingImages = !data.relatedProducts || data.relatedProducts.length === 0 ||
+          data.relatedProducts.some((rp: any) => !rp.imageUrl && !rp.image);
+        if (hasMissingImages && data.relatedProductIds && data.relatedProductIds.length > 0) {
           try {
-            const allProducts = await catalogApi.getProducts();
+            const allProducts = await catalogApi.getProducts(undefined, 100);
             const matched = allProducts.filter((p: any) => data.relatedProductIds?.includes(p.id));
             setFallbackProducts(matched);
           } catch (e) {
@@ -177,9 +179,19 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
     ? new Date(post.publishedAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Mới cập nhật';
 
-  const displayRelatedProducts = (post.relatedProducts && post.relatedProducts.length > 0)
-    ? post.relatedProducts
-    : fallbackProducts;
+  const displayRelatedProducts = useMemo(() => {
+    if (!post?.relatedProducts || post.relatedProducts.length === 0) {
+      return fallbackProducts;
+    }
+    return post.relatedProducts.map((rp) => {
+      const fb = fallbackProducts.find((p) => p.id === rp.id);
+      return {
+        ...rp,
+        image: rp.imageUrl || (rp as any).image || fb?.image || fb?.imageUrl || fb?.thumbnailUrl || fb?.images?.[0] || '/images/paddle.png',
+        price: rp.price || fb?.price || (rp as any).effectivePrice || (rp as any).basePrice || 0,
+      };
+    });
+  }, [post?.relatedProducts, fallbackProducts]);
 
   return (
     <div className="py-10 sm:py-14 bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors">
@@ -285,9 +297,12 @@ Luôn di chuyển tiến - lùi cùng nhịp với đồng đội tạo thành m
                     className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:border-emerald-500 hover:shadow-md transition-all flex items-center gap-3 group"
                   >
                     <img
-                      src={p.imageUrl || p.thumbnailUrl || '/images/paddle.png'}
+                      src={p.image || p.imageUrl || p.thumbnailUrl || p.images?.[0] || '/images/paddle.png'}
                       alt={p.name || 'Sản phẩm Pickleball'}
                       className="w-14 h-14 object-contain rounded-xl bg-slate-50 dark:bg-slate-800 p-1 shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/images/paddle.png';
+                      }}
                     />
                     <div className="truncate space-y-0.5">
                       <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-emerald-600">

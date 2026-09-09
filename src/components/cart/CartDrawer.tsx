@@ -6,11 +6,14 @@ import { useCartStore } from '@/lib/store/useCartStore';
 import { paymentApi } from '@/lib/api/paymentApi';
 import { cartOrderApi } from '@/lib/api/cartOrderApi';
 
+import { useRouter } from 'next/navigation';
+
 interface CartDrawerProps {
   onOpenPayOS?: (qrUrl: string, amount: number) => void;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenPayOS }) => {
+  const router = useRouter();
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, getSubtotal, clearCart } = useCartStore();
   const [paymentMethod, setPaymentMethod] = useState<'PayOS' | 'COD'>('PayOS');
   const [loading, setLoading] = useState(false);
@@ -19,35 +22,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenPayOS }) => {
 
   const total = getSubtotal();
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (items.length === 0) return;
-    setLoading(true);
-    try {
-      const order = await cartOrderApi.checkoutOrder({
-        totalAmount: total,
-        paymentMethod,
-        customerName: 'Nguyen Van A',
-        customerPhone: '0901234567',
-        shippingAddress: '123 Le Loi, Quan 1, TP.HCM',
-      });
-
-      if (paymentMethod === 'PayOS') {
-        const paymentRes = await paymentApi.createPaymentLink({
-          orderId: order.id,
-          amount: total,
-        });
-        setIsOpen(false);
-        onOpenPayOS?.(paymentRes.qrCodeUrl, total);
-      } else {
-        alert('Đơn hàng COD của bạn đã được khởi tạo thành công!');
-        clearCart();
-        setIsOpen(false);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    setIsOpen(false);
+    router.push('/checkout');
   };
 
   return (

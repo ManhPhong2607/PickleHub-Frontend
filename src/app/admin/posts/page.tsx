@@ -82,7 +82,7 @@ export default function AdminPostsPage() {
           pageSize: 10,
         }),
         blogApi.getCategories(),
-        catalogApi.getProducts().catch(() => []),
+        catalogApi.getProducts(undefined, 100).catch(() => []),
       ]);
 
       setPosts(postRes.items || []);
@@ -137,6 +137,23 @@ export default function AdminPostsPage() {
         seoDescription: postDetail.seoDescription || '',
         relatedProductIds: postDetail.relatedProductIds || [],
       });
+      // Nếu bài viết đã gắn sẵn sản phẩm, nạp vào availableProducts nếu chưa có
+      if (postDetail.relatedProducts && postDetail.relatedProducts.length > 0) {
+        setAvailableProducts((prev) => {
+          const prevIds = new Set(prev.map((p) => p.id));
+          const toAdd = postDetail.relatedProducts!
+            .filter((rp) => !prevIds.has(rp.id))
+            .map((rp) => ({
+              id: rp.id,
+              name: rp.name,
+              slug: rp.slug,
+              price: rp.price || rp.effectivePrice || rp.basePrice || 0,
+              image: rp.imageUrl || (rp as any).image || '/images/paddle.png',
+              imageUrl: rp.imageUrl,
+            }));
+          return toAdd.length > 0 ? [...toAdd, ...prev] : prev;
+        });
+      }
       setCoverPreview(postDetail.coverImageUrl || '');
       setCoverFile(null);
       setProductSearch('');
@@ -654,7 +671,7 @@ export default function AdminPostsPage() {
                             <button
                               onClick={() => handleArchive(post.id)}
                               className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-600 dark:text-amber-400"
-                              title="Ẩn bài viết (Private)"
+                              title="Riêng tư (Private)"
                             >
                               <Archive className="w-3.5 h-3.5" />
                             </button>
@@ -962,9 +979,12 @@ export default function AdminPostsPage() {
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-xs font-semibold border border-emerald-300 dark:border-emerald-800 shadow-sm"
                         >
                           <img
-                            src={prod?.thumbnailUrl || prod?.imageUrl || '/images/paddle.png'}
-                            alt=""
-                            className="w-4 h-4 object-cover rounded-md"
+                            src={prod?.image || prod?.imageUrl || prod?.thumbnailUrl || prod?.images?.[0] || '/images/paddle.png'}
+                            alt={prod?.name || ''}
+                            className="w-4 h-4 object-cover rounded-md bg-slate-100 dark:bg-slate-800"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/images/paddle.png';
+                            }}
                           />
                           <span className="truncate max-w-[150px]">{prod?.name || 'Sản phẩm đã chọn'}</span>
                           <button
@@ -1003,9 +1023,12 @@ export default function AdminPostsPage() {
                         >
                           <div className="flex items-center gap-2.5 truncate">
                             <img
-                              src={p.thumbnailUrl || p.imageUrl || '/images/paddle.png'}
+                              src={p.image || p.imageUrl || p.thumbnailUrl || p.images?.[0] || '/images/paddle.png'}
                               alt={p.name}
                               className="w-7 h-7 rounded-lg object-contain bg-slate-100 dark:bg-slate-800 p-0.5 shrink-0"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/images/paddle.png';
+                              }}
                             />
                             <div className="truncate">
                               <p className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate">
@@ -1166,9 +1189,12 @@ export default function AdminPostsPage() {
                         className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3"
                       >
                         <img
-                          src={p.imageUrl || '/images/paddle.png'}
+                          src={p.image || p.imageUrl || p.thumbnailUrl || p.images?.[0] || '/images/paddle.png'}
                           alt={p.name}
                           className="w-12 h-12 object-contain rounded-xl bg-slate-50 dark:bg-slate-800 p-1 shrink-0"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/images/paddle.png';
+                          }}
                         />
                         <div className="truncate space-y-0.5">
                           <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate">

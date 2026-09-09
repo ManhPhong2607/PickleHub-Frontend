@@ -309,6 +309,8 @@ function mapProductDto(dto: BackendProductListDto): Product {
     rating: 4.9,
     reviewsCount: 28,
     image: firstImage || defaultImageMap[catKey] || '/images/paddle.png',
+    imageUrl: firstImage || defaultImageMap[catKey] || '/images/paddle.png',
+    thumbnailUrl: firstImage || defaultImageMap[catKey] || '/images/paddle.png',
     images: imagesList,
     stock: (dto as any).stock ?? (dto as any).availableQuantity ?? (dto as any).quantity ?? 25,
     description: dto.description || `${dto.name} chính hãng tiêu chuẩn thi đấu.`,
@@ -325,10 +327,11 @@ function mapProductDto(dto: BackendProductListDto): Product {
 // ──────────────────────────────────────────────
 
 export const catalogApi = {
-  async getProducts(category?: string): Promise<Product[]> {
+  async getProducts(category?: string, pageSize?: number): Promise<Product[]> {
     try {
-      const params: Record<string, string | undefined> = {};
+      const params: Record<string, string | number | undefined> = {};
       if (category && category !== 'all') params.keyword = category;
+      if (pageSize) params.pageSize = pageSize;
 
       const res = await apiClient.get<PagedResult<BackendProductListDto>>('/products', { params });
       const items = res.data?.items ?? [];
