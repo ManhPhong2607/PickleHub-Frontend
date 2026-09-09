@@ -115,13 +115,6 @@ function applyFiltersAndSort(
   return result;
 }
 
-interface UndoState {
-  deletedItems: AdminProduct[];
-  countdown: number;
-  timer: NodeJS.Timeout;
-  interval: NodeJS.Timeout;
-}
-
 // ─── Main Component ───
 export const ProductsModule: React.FC = () => {
   // ── Data state ──
@@ -130,9 +123,6 @@ export const ProductsModule: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
-
-  // ── Undo Delete state ──
-  const [undoState, setUndoState] = useState<UndoState | null>(null);
 
   // ── Filters & search ──
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -322,9 +312,11 @@ export const ProductsModule: React.FC = () => {
   const handleConfirmDelete = async () => {
     const { itemsToDelete } = deleteModalState;
     setDeleteModalState({ isOpen: false, itemsToDelete: [], isBulk: false });
+    if (!itemsToDelete || itemsToDelete.length === 0) return;
 
-    // 1. Optimistic delete: ngay lập tức lọc bỏ khỏi danh sách hiển thị
     const deleteIds = new Set(itemsToDelete.map((i) => i.id));
+
+    // Optimistically update UI
     setAllProducts((prev) => prev.filter((p) => !deleteIds.has(p.id)));
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -332,41 +324,21 @@ export const ProductsModule: React.FC = () => {
       return next;
     });
 
-    // 2. Bắt đầu đếm ngược 5 giây để Hoàn tác (Undo)
-    let count = 5;
-    const interval = setInterval(() => {
-      count -= 1;
-      setUndoState((u) => (u ? { ...u, countdown: count } : null));
-    }, 1000);
-
-    const timer = setTimeout(async () => {
-      clearInterval(interval);
-      setUndoState(null);
-      try {
-        for (const item of itemsToDelete) {
-          await adminApi.deleteProduct(item.id);
-        }
-      } catch (err: any) {
-        showToast('Lỗi khi xóa sản phẩm trên máy chủ: ' + (err?.response?.data?.message || err?.message), 'error');
-        fetchProducts();
+    try {
+      for (const item of itemsToDelete) {
+        await adminApi.deleteProduct(item.id);
       }
-    }, 5000);
-
-    setUndoState({
-      deletedItems: itemsToDelete,
-      countdown: 5,
-      timer,
-      interval,
-    });
-  };
-
-  const handleUndoDelete = () => {
-    if (!undoState) return;
-    clearTimeout(undoState.timer);
-    clearInterval(undoState.interval);
-    setAllProducts((prev) => [...undoState.deletedItems, ...prev]);
-    showToast(`Đã hoàn tác xóa ${undoState.deletedItems.length} sản phẩm!`);
-    setUndoState(null);
+      showToast(
+        itemsToDelete.length === 1
+          ? `Đã xóa sản phẩm "${itemsToDelete[0].name}" thành công!`
+          : `Đã xóa thành công ${itemsToDelete.length} sản phẩm!`,
+        'success'
+      );
+    } catch (err: any) {
+      console.error('Delete product failed:', err);
+      showToast('Lỗi khi xóa sản phẩm trên máy chủ: ' + (err?.response?.data?.message || err?.message), 'error');
+      await fetchProducts();
+    }
   };
 
   // ── Bulk Status / Category Changes ──
@@ -956,41 +928,6 @@ export const ProductsModule: React.FC = () => {
         </div>
       )}
 
-      {/* Floating 5-Second Undo Toast */}
-      {undoState && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="flex items-center gap-3 px-5 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 backdrop-blur-xl">
-            <div className="flex items-center gap-2 pr-3 border-r border-slate-700">
-              <span className="w-6 h-6 rounded-full bg-rose-500 text-white text-[11px] font-black flex items-center justify-center">
-                {undoState.deletedItems.length}
-              </span>
-              <span className="text-xs font-bold text-slate-200">
-                Đã xóa {undoState.deletedItems.length} sản phẩm
-              </span>
-            </div>
-
-            <button
-              onClick={handleUndoDelete}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.97]"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Hoàn tác ({undoState.countdown}s)</span>
-            </button>
-
-            <button
-              onClick={() => {
-                clearTimeout(undoState.timer);
-                clearInterval(undoState.interval);
-                setUndoState(null);
-              }}
-              className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors"
-              title="Đóng"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

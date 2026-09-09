@@ -160,16 +160,28 @@ const MOCK_PRODUCTS: Product[] = [
   },
 ];
 
+export interface CategoryDto {
+  id: string;
+  name: string;
+  slug: string;
+  parentId?: string | null;
+  imageUrl?: string;
+  url?: string;
+  description?: string;
+  children?: CategoryDto[];
+}
+
 // Map backend category slug to frontend category key
 function mapCategorySlug(slug?: string): string {
   if (!slug) return 'paddle';
   const s = slug.toLowerCase();
-  if (s.includes('vot') || s.includes('paddle')) return 'paddle';
-  if (s.includes('bong') || s.includes('ball')) return 'balls';
-  if (s.includes('giay') || s.includes('shoe') || s.includes('footwear')) return 'shoes';
-  if (s.includes('tui') || s.includes('bag') || s.includes('balo') || s.includes('backpack')) return 'bag';
-  if (s.includes('quan') || s.includes('ao') || s.includes('apparel') || s.includes('clothing') || s.includes('jersey') || s.includes('short') || s.includes('polo')) return 'apparel';
-  if (s.includes('phu-kien') || s.includes('accessory') || s.includes('accessories') || s.includes('grip') || s.includes('tape') || s.includes('luoi') || s.includes('net')) return 'accessories';
+  // Support both standard slugs (vot, bong) and Vietnamese diacritic-stripped slugs (vt, bng, giy, ti, qun, li)
+  if (s.includes('vt') || s.includes('vot') || s.includes('paddle')) return 'paddle';
+  if (s.includes('bng') || s.includes('bong') || s.includes('ball')) return 'balls';
+  if (s.includes('giy') || s.includes('giay') || s.includes('shoe') || s.includes('footwear')) return 'shoes';
+  if (s.includes('ti') || s.includes('tui') || s.includes('bag') || s.includes('balo') || s.includes('backpack')) return 'bag';
+  if (s.includes('qun') || s.includes('quan') || s.includes('ao') || s.includes('apparel') || s.includes('clothing') || s.includes('jersey') || s.includes('short') || s.includes('polo')) return 'apparel';
+  if (s.includes('li') || s.includes('luoi') || s.includes('ph-kin') || s.includes('phu-kien') || s.includes('accessory') || s.includes('accessories') || s.includes('grip') || s.includes('tape') || s.includes('net')) return 'accessories';
   return 'paddle';
 }
 
@@ -454,36 +466,74 @@ export const catalogApi = {
     }
   },
 
-  async getCategories(): Promise<{ id: string; name: string; slug: string; imageUrl?: string; url?: string; description?: string }[]> {
+  async getCategories(): Promise<CategoryDto[]> {
     try {
       const res = await apiClient.get<any>('/categories');
       const items = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
       if (items.length > 0) {
-        return items.map((c: any) => ({
+        const mapCategory = (c: any): CategoryDto => ({
           id: c.id,
           name: c.name,
           slug: c.slug?.value || c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
+          parentId: c.parentId ?? null,
           imageUrl: c.url || c.imageUrl || undefined,
           url: c.url || c.imageUrl || undefined,
           description: c.description || undefined,
-        }));
+          children: Array.isArray(c.children) ? c.children.map(mapCategory) : [],
+        });
+
+        return items.map(mapCategory);
       }
       return [
-        { id: '1', name: 'Vợt Pickleball', slug: 'vot-pickleball', imageUrl: '/images/paddle.png' },
-        { id: '2', name: 'Bóng thi đấu', slug: 'bong-thi-dau', imageUrl: '/images/balls.png' },
-        { id: '3', name: 'Giày thể thao', slug: 'giay-the-thao', imageUrl: '/images/paddle.png' },
-        { id: '4', name: 'Túi & Balo', slug: 'tui-balo', imageUrl: '/images/bag.png' },
-        { id: '5', name: 'Quần áo', slug: 'quan-ao', imageUrl: '/images/paddle.png' },
-        { id: '6', name: 'Lưới & Phụ kiện', slug: 'luoi-phu-kien', imageUrl: '/images/net.png' },
+        { id: '1', name: 'Vợt Pickleball', slug: 'vot-pickleball', imageUrl: '/images/paddle.png', children: [] },
+        { id: '2', name: 'Bóng thi đấu', slug: 'bong-thi-dau', imageUrl: '/images/balls.png', children: [] },
+        { id: '3', name: 'Giày thể thao', slug: 'giay-the-thao', imageUrl: '/images/paddle.png', children: [] },
+        {
+          id: '5',
+          name: 'Quần áo',
+          slug: 'quan-ao',
+          imageUrl: '/images/paddle.png',
+          children: [
+            { id: '5-1', name: 'Quần áo nam', slug: 'quan-ao-nam', parentId: '5', children: [] },
+            { id: '5-2', name: 'Quần áo nữ', slug: 'quan-ao-nu', parentId: '5', children: [] },
+          ],
+        },
+        {
+          id: '6',
+          name: 'Lưới & Phụ kiện',
+          slug: 'luoi-phu-kien',
+          imageUrl: '/images/net.png',
+          children: [
+            { id: '4', name: 'Túi & Balo', slug: 'tui-balo', parentId: '6', imageUrl: '/images/bag.png', children: [] },
+            { id: '6-1', name: 'Lưới', slug: 'luoi', parentId: '6', imageUrl: '/images/net.png', children: [] },
+          ],
+        },
       ];
     } catch {
       return [
-        { id: '1', name: 'Vợt Pickleball', slug: 'vot-pickleball', imageUrl: '/images/paddle.png' },
-        { id: '2', name: 'Bóng thi đấu', slug: 'bong-thi-dau', imageUrl: '/images/balls.png' },
-        { id: '3', name: 'Giày thể thao', slug: 'giay-the-thao', imageUrl: '/images/paddle.png' },
-        { id: '4', name: 'Túi & Balo', slug: 'tui-balo', imageUrl: '/images/bag.png' },
-        { id: '5', name: 'Quần áo', slug: 'quan-ao', imageUrl: '/images/paddle.png' },
-        { id: '6', name: 'Lưới & Phụ kiện', slug: 'luoi-phu-kien', imageUrl: '/images/net.png' },
+        { id: '1', name: 'Vợt Pickleball', slug: 'vot-pickleball', imageUrl: '/images/paddle.png', children: [] },
+        { id: '2', name: 'Bóng thi đấu', slug: 'bong-thi-dau', imageUrl: '/images/balls.png', children: [] },
+        { id: '3', name: 'Giày thể thao', slug: 'giay-the-thao', imageUrl: '/images/paddle.png', children: [] },
+        {
+          id: '5',
+          name: 'Quần áo',
+          slug: 'quan-ao',
+          imageUrl: '/images/paddle.png',
+          children: [
+            { id: '5-1', name: 'Quần áo nam', slug: 'quan-ao-nam', parentId: '5', children: [] },
+            { id: '5-2', name: 'Quần áo nữ', slug: 'quan-ao-nu', parentId: '5', children: [] },
+          ],
+        },
+        {
+          id: '6',
+          name: 'Lưới & Phụ kiện',
+          slug: 'luoi-phu-kien',
+          imageUrl: '/images/net.png',
+          children: [
+            { id: '4', name: 'Túi & Balo', slug: 'tui-balo', parentId: '6', imageUrl: '/images/bag.png', children: [] },
+            { id: '6-1', name: 'Lưới', slug: 'luoi', parentId: '6', imageUrl: '/images/net.png', children: [] },
+          ],
+        },
       ];
     }
   },

@@ -23,7 +23,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { ProductCard } from '@/components/common/ProductCard';
-import { catalogApi } from '@/lib/api/catalogApi';
+import { catalogApi, CategoryDto } from '@/lib/api/catalogApi';
 import { Product } from '@/types';
 
 function ProductListingContent() {
@@ -31,9 +31,10 @@ function ProductListingContent() {
   const initialCategory = searchParams.get('category') || 'all';
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [dbCategories, setDbCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [dbCategories, setDbCategories] = useState<CategoryDto[]>([]);
   const [dbBrands, setDbBrands] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   // ─── Collapsible Filter Sections State ─────────────────────────────────
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -102,6 +103,15 @@ function ProductListingContent() {
       setDbCategories(cats);
       setDbBrands(brs);
       setLoading(false);
+
+      // Initialize all parents that have children to expanded
+      const initialExp: Record<string, boolean> = {};
+      cats.forEach((c) => {
+        if (c.children && c.children.length > 0) {
+          initialExp[c.id] = true;
+        }
+      });
+      setExpandedCategories(initialExp);
     });
   }, []);
 
@@ -113,38 +123,98 @@ function ProductListingContent() {
     }
   }, [searchParams]);
 
-  // Standard category definitions
-  const CATEGORIES = useMemo(() => [
-    { id: 'all', label: 'Tất cả sản phẩm', icon: Layers },
-    { id: 'paddle', label: 'Vợt Pickleball', icon: Award },
-    { id: 'balls', label: 'Bóng thi đấu', icon: Package },
-    { id: 'shoes', label: 'Giày thể thao', icon: Tag },
-    { id: 'bag', label: 'Túi & Balo', icon: Package },
-    { id: 'apparel', label: 'Quần áo', icon: Tag },
-    { id: 'accessories', label: 'Lưới & Phụ kiện', icon: Award },
-  ], []);
+  // Toggle expand/collapse for a parent category
+  const toggleCategoryExpand = (catId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [catId]: !prev[catId],
+    }));
+  };
 
-  // Category product counts
+  // Helper: get all IDs for category and all its descendants
+  const getCategoryFamilyIds = (cat: CategoryDto): string[] => {
+    const ids = [cat.id];
+    if (Array.isArray(cat.children)) {
+      for (const child of cat.children) {
+        ids.push(...getCategoryFamilyIds(child));
+      }
+    }
+    return ids;
+  };
+
+  // Helper: search node anywhere in tree by id, slug, or legacy filter key
+  const findCategoryNode = (tree: CategoryDto[], key: string): CategoryDto | null => {
+    if (!key || key === 'all') return null;
+    const k = key.toLowerCase();
+    for (const node of tree) {
+      if (
+        node.id.toLowerCase() === k ||
+        node.slug.toLowerCase() === k ||
+        (k === 'paddle' && (node.slug.includes('vt') || node.slug.includes('vot') || node.name.toLowerCase().includes('vợt'))) ||
+        (k === 'balls' && (node.slug.includes('bng') || node.slug.includes('bong') || node.name.toLowerCase().includes('bóng'))) ||
+        (k === 'shoes' && (node.slug.includes('giy') || node.slug.includes('giay') || node.name.toLowerCase().includes('giày'))) ||
+        (k === 'bag' && (node.slug.includes('ti') || node.slug.includes('tui') || node.name.toLowerCase().includes('túi'))) ||
+        (k === 'apparel' && (node.slug.includes('qun') || node.slug.includes('quan') || node.name.toLowerCase().includes('quần') || node.name.toLowerCase().includes('áo'))) ||
+        (k === 'accessories' && (node.slug.includes('li') || node.slug.includes('luoi') || node.slug.includes('ph-kin') || node.slug.includes('phu-kien') || node.name.toLowerCase().includes('phụ kiện')))
+      ) {
+        return node;
+      }
+      if (node.children && node.children.length > 0) {
+        const found = findCategoryNode(node.children, key);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Helper: determine appropriate icon for category
+  const getCategoryIcon = (name: string, slug: string) => {
+    const s = (slug + ' ' + name).toLowerCase();
+    if (s.includes('vt') || s.includes('vot') || s.includes('paddle')) return Award;
+    if (s.includes('bng') || s.includes('bong') || s.includes('ball')) return Package;
+    if (s.includes('giy') || s.includes('giay') || s.includes('shoe')) return Tag;
+    if (s.includes('ti') || s.includes('tui') || s.includes('bag') || s.includes('balo')) return Package;
+    if (s.includes('qun') || s.includes('quan') || s.includes('ao') || s.includes('apparel')) return Tag;
+    if (s.includes('li') || s.includes('luoi') || s.includes('ph-kin') || s.includes('phu-kien') || s.includes('accessories')) return Layers;
+    return Tag;
+  };
+
+  // Category product counts: accurately calculated for each node (including parent roll-up)
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: products.length };
-    CATEGORIES.forEach((c) => {
-      if (c.id !== 'all') {
-        counts[c.id] = products.filter((p) => {
-          const cat = (p.category || '').toLowerCase();
-          const cName = (p.categoryName || '').toLowerCase();
-          const slug = (p.slug || '').toLowerCase();
-          if (c.id === 'paddle') return cat.includes('paddle') || cat.includes('vot') || cName.includes('vợt');
-          if (c.id === 'balls') return cat.includes('ball') || cat.includes('bong') || cName.includes('bóng');
-          if (c.id === 'shoes') return cat.includes('shoe') || cat.includes('giay') || cName.includes('giày');
-          if (c.id === 'bag') return cat.includes('bag') || cat.includes('balo') || cat.includes('tui') || cName.includes('túi');
-          if (c.id === 'apparel') return cat.includes('apparel') || cat.includes('ao') || cat.includes('quan') || cName.includes('áo');
-          if (c.id === 'accessories') return cat.includes('accessories') || cat.includes('phu-kien') || cat.includes('luoi') || cName.includes('phụ kiện');
-          return cat === c.id.toLowerCase() || slug.includes(c.id.toLowerCase());
-        }).length;
+
+    const countNode = (node: CategoryDto) => {
+      const familyIds = new Set(getCategoryFamilyIds(node).map((id) => id.toLowerCase()));
+      const nodeSlug = node.slug.toLowerCase();
+      const nodeName = node.name.toLowerCase();
+
+      const matchingCount = products.filter((p) => {
+        // 1. Primary check: Exact Category ID matching (Standard DB behavior)
+        if (p.categoryId && familyIds.has(p.categoryId.toLowerCase())) {
+          return true;
+        }
+        // 2. Fallback check for seed / mock data where categoryId is not set
+        if (!p.categoryId) {
+          const pCat = (p.category || '').toLowerCase();
+          const pCatName = (p.categoryName || '').toLowerCase();
+          if (pCat && (nodeSlug.includes(pCat) || pCat.includes(nodeSlug))) return true;
+          if (pCatName && (nodeName.includes(pCatName) || pCatName.includes(nodeName))) return true;
+        }
+        return false;
+      }).length;
+
+      counts[node.id] = matchingCount;
+      counts[node.slug] = matchingCount;
+
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(countNode);
       }
-    });
+    };
+
+    dbCategories.forEach(countNode);
     return counts;
-  }, [products, CATEGORIES]);
+  }, [products, dbCategories]);
 
   // Extracted distinct brands from products & dbBrands
   const availableBrands = useMemo(() => {
@@ -247,18 +317,30 @@ function ProductListingContent() {
 
     // 1. Category Filter
     if (selectedCategory !== 'all') {
-      list = list.filter((p) => {
-        const c = (p.category || '').toLowerCase();
-        const cName = (p.categoryName || '').toLowerCase();
-        const slug = (p.slug || '').toLowerCase();
-        if (selectedCategory === 'paddle') return c.includes('paddle') || c.includes('vot') || cName.includes('vợt');
-        if (selectedCategory === 'balls') return c.includes('ball') || c.includes('bong') || cName.includes('bóng');
-        if (selectedCategory === 'shoes') return c.includes('shoe') || c.includes('giay') || cName.includes('giày');
-        if (selectedCategory === 'bag') return c.includes('bag') || c.includes('balo') || c.includes('tui') || cName.includes('túi');
-        if (selectedCategory === 'apparel') return c.includes('apparel') || c.includes('ao') || c.includes('quan') || cName.includes('áo');
-        if (selectedCategory === 'accessories') return c.includes('accessories') || c.includes('phu-kien') || c.includes('luoi') || cName.includes('phụ kiện');
-        return c === selectedCategory.toLowerCase() || slug.includes(selectedCategory.toLowerCase());
-      });
+      const activeNode = findCategoryNode(dbCategories, selectedCategory);
+      if (activeNode) {
+        const familyIds = new Set(getCategoryFamilyIds(activeNode).map((id) => id.toLowerCase()));
+        list = list.filter((p) => {
+          if (p.categoryId) {
+            return familyIds.has(p.categoryId.toLowerCase());
+          }
+          // Fallback for mock items without categoryId
+          const c = (p.category || '').toLowerCase();
+          const cName = (p.categoryName || '').toLowerCase();
+          const nodeSlug = activeNode.slug.toLowerCase();
+          const nodeName = activeNode.name.toLowerCase();
+          return c.includes(nodeSlug) || nodeSlug.includes(c) || cName.includes(nodeName) || nodeName.includes(cName);
+        });
+      } else {
+        // Fallback if dbCategories not yet populated or legacy query key
+        const sc = selectedCategory.toLowerCase();
+        list = list.filter((p) => {
+          const c = (p.category || '').toLowerCase();
+          const cName = (p.categoryName || '').toLowerCase();
+          const slug = (p.slug || '').toLowerCase();
+          return c === sc || cName.includes(sc) || slug.includes(sc);
+        });
+      }
     }
 
     // 2. Search Query
@@ -518,7 +600,7 @@ function ProductListingContent() {
             {/* Category badge */}
             {selectedCategory !== 'all' && (
               <span className="px-3 py-1 bg-emerald-600 text-white rounded-full font-bold flex items-center gap-1.5 text-[11px] shadow-xs">
-                Danh mục: {CATEGORIES.find((c) => c.id === selectedCategory)?.label || selectedCategory}
+                Danh mục: {findCategoryNode(dbCategories, selectedCategory)?.name || selectedCategory}
                 <X className="w-3 h-3 cursor-pointer hover:opacity-75" onClick={() => handleCategoryChange('all')} />
               </span>
             )}
@@ -648,32 +730,138 @@ function ProductListingContent() {
 
               {openSections.category && (
                 <div className="space-y-1 text-xs font-semibold pt-2 animate-in fade-in duration-200">
-                  {CATEGORIES.map((c) => {
-                    const Icon = c.icon;
-                    const isSelected = selectedCategory === c.id;
-                    const count = categoryCounts[c.id] || 0;
+                  {/* All products option */}
+                  <button
+                    onClick={() => handleCategoryChange('all')}
+                    className={`w-full text-left px-3 py-2 rounded-xl transition-all flex items-center justify-between cursor-pointer ${
+                      selectedCategory === 'all'
+                        ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Layers className={`w-3.5 h-3.5 ${selectedCategory === 'all' ? 'text-white' : 'text-slate-400'}`} />
+                      <span>Tất cả sản phẩm</span>
+                    </span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                        selectedCategory === 'all'
+                          ? 'bg-emerald-700/80 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {products.length}
+                    </span>
+                  </button>
+
+                  {/* Hierarchical category list from DB */}
+                  {dbCategories.map((parent) => {
+                    const Icon = getCategoryIcon(parent.name, parent.slug);
+                    const isParentSelected = selectedCategory === parent.id || selectedCategory === parent.slug;
+                    const hasChildren = Array.isArray(parent.children) && parent.children.length > 0;
+                    const isExpanded = expandedCategories[parent.id] ?? true;
+                    const parentCount = categoryCounts[parent.id] ?? 0;
+
+                    // Check if any child of this parent is currently selected
+                    const isChildSelected =
+                      hasChildren &&
+                      parent.children!.some(
+                        (ch) => selectedCategory === ch.id || selectedCategory === ch.slug
+                      );
+
                     return (
-                      <button
-                        key={c.id}
-                        onClick={() => handleCategoryChange(c.id)}
-                        className={`w-full text-left px-3 py-2 rounded-xl transition-all flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-emerald-600 text-white font-bold shadow-sm'
-                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
-                          <span>{c.label}</span>
-                        </span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
-                          isSelected
-                            ? 'bg-emerald-700/80 text-white'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                        }`}>
-                          {count}
-                        </span>
-                      </button>
+                      <div key={parent.id} className="space-y-1">
+                        <div className="flex items-center gap-1 group">
+                          <button
+                            onClick={() => handleCategoryChange(parent.id)}
+                            className={`flex-1 text-left px-3 py-2 rounded-xl transition-all flex items-center justify-between cursor-pointer min-w-0 ${
+                              isParentSelected
+                                ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                : isChildSelected
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200/60 dark:border-emerald-800/60'
+                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Icon
+                                className={`w-3.5 h-3.5 shrink-0 ${
+                                  isParentSelected
+                                    ? 'text-white'
+                                    : isChildSelected
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-slate-400'
+                                }`}
+                              />
+                              <span className="truncate">{parent.name}</span>
+                            </span>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold shrink-0 ml-1.5 ${
+                                isParentSelected
+                                  ? 'bg-emerald-700/80 text-white'
+                                  : isChildSelected
+                                  ? 'bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                              }`}
+                            >
+                              {parentCount}
+                            </span>
+                          </button>
+
+                          {/* Toggle child accordion if category has subcategories */}
+                          {hasChildren && (
+                            <button
+                              type="button"
+                              onClick={(e) => toggleCategoryExpand(parent.id, e)}
+                              className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-transform cursor-pointer ${
+                                isExpanded ? 'rotate-180 text-emerald-600' : ''
+                              }`}
+                              title={isExpanded ? 'Thu gọn danh mục con' : 'Mở rộng danh mục con'}
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Subcategories nested inside parent */}
+                        {hasChildren && isExpanded && (
+                          <div className="pl-4 ml-3 border-l-2 border-slate-200/80 dark:border-slate-800 space-y-1 pt-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                            {parent.children!.map((child) => {
+                              const isChildActive =
+                                selectedCategory === child.id || selectedCategory === child.slug;
+                              const childCount = categoryCounts[child.id] ?? 0;
+                              return (
+                                <button
+                                  key={child.id}
+                                  onClick={() => handleCategoryChange(child.id)}
+                                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-all flex items-center justify-between text-[11px] cursor-pointer ${
+                                    isChildActive
+                                      ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                  }`}
+                                >
+                                  <span className="flex items-center gap-1.5 truncate">
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                        isChildActive ? 'bg-white' : 'bg-slate-300 dark:bg-slate-600'
+                                      }`}
+                                    />
+                                    <span className="truncate">{child.name}</span>
+                                  </span>
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-bold shrink-0 ml-1 ${
+                                      isChildActive
+                                        ? 'bg-emerald-700/80 text-white'
+                                        : 'bg-slate-100 dark:bg-slate-800/80 text-slate-400'
+                                    }`}
+                                  >
+                                    {childCount}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
