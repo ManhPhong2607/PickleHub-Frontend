@@ -107,6 +107,18 @@ export interface AdminInventoryMovementDto {
   createdAt: string;
 }
 
+export interface AdminOrderItemSummaryDto {
+  id?: string;
+  productId?: string;
+  productVariantId?: string;
+  productName: string;
+  productImage?: string;
+  imageUrl?: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal?: number;
+}
+
 export interface AdminOrderDto {
   id: string;
   orderNumber: string;
@@ -114,8 +126,10 @@ export interface AdminOrderDto {
   customerPhone: string;
   totalAmount: number;
   itemCount: number;
+  firstProductId?: string;
   firstItemName: string;
   firstItemImage?: string;
+  items?: AdminOrderItemSummaryDto[];
   paymentMethod: string;
   paymentStatus: string;
   shippingProvider?: string;
@@ -854,8 +868,20 @@ export const adminApi = {
         customerPhone: o.shippingPhone || '—',
         totalAmount: o.totalAmount,
         itemCount: o.itemCount ?? 1,
+        firstProductId: o.firstProductId,
         firstItemName: o.firstItemName || '',
         firstItemImage: o.firstItemImage,
+        items: (o.items || []).map((i: any) => ({
+          id: i.id,
+          productId: i.productId,
+          productVariantId: i.productVariantId,
+          productName: i.productName || i.productNameSnapshot || 'Sản phẩm',
+          productImage: i.productImage || i.imageUrl || i.imageUrlSnapshot || '/images/paddle.png',
+          imageUrl: i.imageUrl || i.productImage || i.imageUrlSnapshot || '/images/paddle.png',
+          unitPrice: Number(i.unitPrice) || 0,
+          quantity: Number(i.quantity) || 1,
+          subtotal: Number(i.subtotal) || ((Number(i.unitPrice) || 0) * (Number(i.quantity) || 1)),
+        })),
         paymentMethod: o.paymentMethod || 'COD',
         paymentStatus: o.paymentStatus || 'Pending',
         shippingProvider: o.shippingProvider,

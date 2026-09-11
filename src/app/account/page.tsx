@@ -1458,6 +1458,25 @@ const filteredOrders = useMemo(() => {
                       const isPayOS = ord.paymentMethod === 'PayOS';
                       const canPayNow = isPayOS && !isPaid && ord.status !== 'Cancelled';
 
+                      const items = (ord.items && ord.items.length > 0)
+                        ? ord.items
+                        : (ord.firstItemName ? [{
+                            productName: ord.firstItemName,
+                            imageUrl: ord.firstItemImage || '/images/paddle.png',
+                            productImage: ord.firstItemImage || '/images/paddle.png',
+                            unitPrice: ord.totalAmount || 0,
+                            quantity: ord.itemCount || 1,
+                          }] : []);
+
+                      const sortedItems = [...items].sort((a: any, b: any) => {
+                        const valA = (Number(a.unitPrice) || 0) * (Number(a.quantity) || 1);
+                        const valB = (Number(b.unitPrice) || 0) * (Number(b.quantity) || 1);
+                        return valB - valA;
+                      });
+                      const representativeItem = sortedItems[0];
+                      const otherProductsCount = Math.max(0, items.length - 1);
+                      const totalQuantity = items.reduce((sum: number, i: any) => sum + (Number(i.quantity) || 1), 0);
+
                       return (
                         <div
                           key={ord.id}
@@ -1503,6 +1522,41 @@ const filteredOrders = useMemo(() => {
                               </span>
                             </div>
                           </div>
+
+                          {/* Product summary block (Bước 4) */}
+                          {representativeItem && (
+                            <div className="flex items-center gap-3.5 bg-white dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                              <div className="w-14 h-14 min-w-[56px] min-h-[56px] rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700/60 flex items-center justify-center shrink-0">
+                                <img
+                                  src={representativeItem.imageUrl || representativeItem.productImage || representativeItem.imageUrlSnapshot || '/images/paddle.png'}
+                                  alt={representativeItem.productName || representativeItem.productNameSnapshot || 'Sản phẩm'}
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src = '/images/paddle.png';
+                                  }}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate"
+                                  title={representativeItem.productName || representativeItem.productNameSnapshot}
+                                >
+                                  {representativeItem.productName || representativeItem.productNameSnapshot}
+                                </div>
+                                <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                                  {otherProductsCount > 0 ? (
+                                    <span>
+                                      và {otherProductsCount} sản phẩm khác · tổng {totalQuantity} sản phẩm
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      Số lượng: {representativeItem.quantity || 1}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Shipping & Payment Method info */}
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-2.5 bg-slate-50/80 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">

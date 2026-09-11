@@ -30,7 +30,6 @@ import gsap from 'gsap';
 export const DashboardModule: React.FC = () => {
   // ── FILTER & SETTINGS ──────────────────────────────────────────────────
   const [period, setPeriod] = useState<DatePeriodValue>(() => computePeriod('preset', { presetKey: '30days' }));
-  const [stockThreshold, setStockThreshold] = useState<number>(15);
   const [activeTab, setActiveTab] = useState<'analytics' | 'orders_conversion'>('analytics');
 
   const days = period.days;
@@ -196,12 +195,15 @@ export const DashboardModule: React.FC = () => {
     }).catch(() => {});
   };
 
-  // Group and sort low stock items from REAL inventory data
+  // Group and sort low stock items from REAL inventory data based on EACH item's own threshold
   const lowStockItems = useMemo(() => {
     return inventoryList
-      .filter((item) => (item.quantity ?? 0) <= stockThreshold)
+      .filter((item) => {
+        const threshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 10;
+        return (item.quantity ?? 0) <= threshold;
+      })
       .sort((a, b) => (a.quantity ?? 0) - (b.quantity ?? 0));
-  }, [inventoryList, stockThreshold]);
+  }, [inventoryList]);
 
   const outOfStockCount = useMemo(() => {
     return lowStockItems.filter(i => (i.quantity ?? 0) <= 0).length;
@@ -499,7 +501,7 @@ export const DashboardModule: React.FC = () => {
               ? 'border-rose-300 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 hover:shadow-md'
               : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
           }`}
-          title="Nhấp vào để xem chi tiết các sản phẩm cảnh báo và điều chỉnh ngưỡng"
+          title="Nhấp vào để xem chi tiết các sản phẩm cảnh báo tồn kho"
         >
           <div className="flex justify-between items-center text-slate-500 gap-1">
             <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors flex items-center gap-0.5 sm:gap-1 truncate">
@@ -886,13 +888,11 @@ export const DashboardModule: React.FC = () => {
         </div>
       )}
 
-      {/* ── LOW STOCK ALERT & THRESHOLD MANAGEMENT MODAL ──────────────── */}
+      {/* ── LOW STOCK ALERT MODAL ──────────────── */}
       <LowStockAlertModal
         isOpen={isLowStockModalOpen}
         onClose={() => setIsLowStockModalOpen(false)}
         inventoryList={inventoryList}
-        stockThreshold={stockThreshold}
-        onUpdateGlobalThreshold={(val) => setStockThreshold(val)}
         onRefreshInventory={refreshInventoryData}
       />
 

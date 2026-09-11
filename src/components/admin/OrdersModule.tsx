@@ -36,8 +36,8 @@ function StatusBadge({ status }: { status: string }) {
 
 const SkeletonRow = () => (
   <tr className="animate-pulse">
-    {[1, 2, 3, 4, 5].map(i => (
-      <td key={i} className="py-4 px-6">
+    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+      <td key={i} className="py-4 px-5">
         <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-md w-3/4" />
         {i === 1 && <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-md w-1/2 mt-1.5" />}
       </td>
@@ -600,17 +600,19 @@ export const OrdersModule: React.FC = () => {
   const { widths, totalWidth, activeResizingKey, startResize } = useResizableColumns({
     storageKey: 'pickle_col_widths_orders',
     defaultWidths: {
-      code: 160,
-      customer: 220,
-      status: 140,
-      payment: 150,
-      shipping: 160,
-      total: 140,
-      actions: 170,
+      code: 150,
+      customer: 170,
+      products: 260,
+      status: 130,
+      payment: 140,
+      shipping: 150,
+      total: 130,
+      actions: 150,
     },
     minWidths: {
-      code: 120,
-      customer: 150,
+      code: 110,
+      customer: 130,
+      products: 180,
       status: 100,
       payment: 110,
       shipping: 110,
@@ -722,6 +724,10 @@ export const OrdersModule: React.FC = () => {
                   Khách hàng
                   <ResizeHandle onMouseDown={(e) => startResize('customer', e)} isResizing={activeResizingKey === 'customer'} />
                 </th>
+                <th style={{ width: widths.products || 260 }} className="relative py-4 px-5 select-none">
+                  Sản phẩm
+                  <ResizeHandle onMouseDown={(e) => startResize('products', e)} isResizing={activeResizingKey === 'products'} />
+                </th>
                 <th style={{ width: widths.status }} className="relative py-4 px-5 select-none">
                   Trạng thái
                   <ResizeHandle onMouseDown={(e) => startResize('status', e)} isResizing={activeResizingKey === 'status'} />
@@ -749,7 +755,7 @@ export const OrdersModule: React.FC = () => {
                 Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center">
+                  <td colSpan={8} className="py-12 text-center">
                     <div className="text-sm text-rose-600 font-bold mb-2">{error}</div>
                     <button onClick={fetchOrders} className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-xl">
                       Thử lại
@@ -758,68 +764,139 @@ export const OrdersModule: React.FC = () => {
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-slate-400 font-medium">
+                  <td colSpan={8} className="py-12 text-center text-sm text-slate-400 font-medium">
                     Không có đơn hàng nào.
                   </td>
                 </tr>
               ) : (
-                orders.map(ord => (
-                  <tr key={ord.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-4 px-5">
-                      <div className="font-bold text-sm text-slate-900 dark:text-white">
-                        {ord.orderNumber}
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                        {new Date(ord.createdAt).toLocaleDateString('vi-VN')}
-                      </div>
-                    </td>
-                    <td className="py-4 px-5">
-                      <div className="font-bold text-slate-900 dark:text-white">{ord.customerName}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{ord.customerPhone}</div>
-                      {ord.firstItemName && (
-                        <div className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[160px]">{ord.firstItemName}{ord.itemCount > 1 ? ` (+${ord.itemCount - 1})` : ''}</div>
-                      )}
-                    </td>
-                    <td className="py-4 px-5">
-                      <StatusBadge status={ord.status} />
-                    </td>
-                    <td className="py-4 px-5">
-                      <div className="font-bold text-slate-700 dark:text-slate-300">{ord.paymentMethod}</div>
-                      <div className="text-[11px] text-slate-400">{ord.paymentStatus}</div>
-                    </td>
-                    <td className="py-4 px-5">
-                      {ord.shippingProvider ? (
-                        <div>
-                          <div className="font-bold text-slate-900 dark:text-white">{ord.shippingProvider}</div>
-                          {ord.trackingNumber && (
-                            <div className="flex items-center gap-1 text-slate-400 font-mono text-[11px] mt-0.5">
-                              <span>{ord.trackingNumber}</span>
-                              <button onClick={() => handleCopy(ord.trackingNumber!)} className="hover:text-slate-600">
-                                {copiedId === ord.trackingNumber ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                              </button>
-                            </div>
-                          )}
+                orders.map(ord => {
+                  const items = (ord.items && ord.items.length > 0)
+                    ? ord.items
+                    : (ord.firstItemName ? [{
+                        productName: ord.firstItemName,
+                        imageUrl: ord.firstItemImage || '/images/paddle.png',
+                        productImage: ord.firstItemImage || '/images/paddle.png',
+                        unitPrice: ord.totalAmount || 0,
+                        quantity: ord.itemCount || 1,
+                      }] : []);
+
+                  // Tìm sản phẩm đại diện có giá trị cao nhất: unitPrice * quantity
+                  const sortedItems = [...items].sort((a, b) => {
+                    const valA = (Number(a.unitPrice) || 0) * (Number(a.quantity) || 1);
+                    const valB = (Number(b.unitPrice) || 0) * (Number(b.quantity) || 1);
+                    return valB - valA;
+                  });
+                  const representativeItem = sortedItems[0];
+                  const otherProductsCount = Math.max(0, items.length - 1);
+                  const displayedAvatars = items.slice(0, 3);
+                  const remainingAvatarsCount = Math.max(0, items.length - 3);
+
+                  return (
+                    <tr key={ord.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-4 px-5">
+                        <div className="font-bold text-sm text-slate-900 dark:text-white">
+                          {ord.orderNumber}
                         </div>
-                      ) : (
-                        <span className="text-slate-400 italic">Chưa có</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-5 text-right font-extrabold text-slate-900 dark:text-white">
-                      {ord.totalAmount.toLocaleString('vi-VN')} ₫
-                    </td>
-                    <td className="py-4 px-5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* Nút Hoàn tiền nếu đơn bị Hủy và thanh toán bằng PayOS */}
-                        {ord.status === 'Cancelled' &&
-                          (ord.paymentMethod?.toLowerCase().includes('payos') || ord.paymentStatus === 'Paid') && (
-                            <button
-                              onClick={() => setSelectedOrderId(ord.id)}
-                              className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 shrink-0"
-                              title="Xử lý hoàn tiền cho đơn hàng thanh toán qua PayOS"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>Hoàn tiền</span>
-                            </button>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                          {new Date(ord.createdAt).toLocaleDateString('vi-VN')}
+                        </div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="font-bold text-slate-900 dark:text-white">{ord.customerName}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{ord.customerPhone}</div>
+                      </td>
+                      <td className="py-4 px-5">
+                        {representativeItem ? (
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {/* Stacked avatars */}
+                            <div className="flex items-center shrink-0">
+                              {displayedAvatars.map((item, idx) => (
+                                <div
+                                  key={item.id || idx}
+                                  className={`relative ${idx > 0 ? '-ml-2.5 sm:-ml-2' : ''} ${idx === 2 ? 'hidden sm:block' : ''}`}
+                                  style={{ zIndex: 10 - idx }}
+                                  title={item.productName}
+                                >
+                                  <img
+                                    src={item.productImage || item.imageUrl || '/images/paddle.png'}
+                                    alt={item.productName}
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).src = '/images/paddle.png';
+                                    }}
+                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover bg-white dark:bg-slate-800 ring-2 ring-white dark:ring-slate-900 shadow-2xs"
+                                  />
+                                </div>
+                              ))}
+                              {remainingAvatarsCount > 0 && (
+                                <div
+                                  className="relative -ml-2.5 sm:-ml-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 ring-2 ring-white dark:ring-slate-900 flex items-center justify-center text-[10px] font-extrabold shadow-2xs shrink-0"
+                                  style={{ zIndex: 5 }}
+                                  title={`Còn ${remainingAvatarsCount} sản phẩm khác`}
+                                >
+                                  +{remainingAvatarsCount}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Representative product name & subline */}
+                            <div className="min-w-0 flex-1">
+                              <div
+                                className="font-bold text-xs text-slate-900 dark:text-white truncate max-w-[140px] sm:max-w-[180px]"
+                                title={representativeItem.productName}
+                              >
+                                {representativeItem.productName}
+                              </div>
+                              {otherProductsCount > 0 && (
+                                <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
+                                  và {otherProductsCount} sản phẩm khác
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-xs">Chưa có</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-5">
+                        <StatusBadge status={ord.status} />
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="font-bold text-slate-700 dark:text-slate-300">{ord.paymentMethod}</div>
+                        <div className="text-[11px] text-slate-400">{ord.paymentStatus}</div>
+                      </td>
+                      <td className="py-4 px-5">
+                        {ord.shippingProvider ? (
+                          <div>
+                            <div className="font-bold text-slate-900 dark:text-white">{ord.shippingProvider}</div>
+                            {ord.trackingNumber && (
+                              <div className="flex items-center gap-1 text-slate-400 font-mono text-[11px] mt-0.5">
+                                <span>{ord.trackingNumber}</span>
+                                <button onClick={() => handleCopy(ord.trackingNumber!)} className="hover:text-slate-600">
+                                  {copiedId === ord.trackingNumber ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">Chưa có</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-5 text-right font-extrabold text-slate-900 dark:text-white">
+                        {ord.totalAmount.toLocaleString('vi-VN')} ₫
+                      </td>
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Nút Hoàn tiền nếu đơn bị Hủy và thanh toán bằng PayOS */}
+                          {ord.status === 'Cancelled' &&
+                            (ord.paymentMethod?.toLowerCase().includes('payos') || ord.paymentStatus === 'Paid') && (
+                              <button
+                                onClick={() => setSelectedOrderId(ord.id)}
+                                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 shrink-0"
+                                title="Xử lý hoàn tiền cho đơn hàng thanh toán qua PayOS"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Hoàn tiền</span>
+                              </button>
                           )}
                         <button
                           onClick={() => setSelectedOrderId(ord.id)}
@@ -830,8 +907,9 @@ export const OrdersModule: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>
